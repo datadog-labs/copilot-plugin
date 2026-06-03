@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "datadog": {
+      "type": "http",
+      "url": "https://not-setup/api/unstable/mcp-server/mcp?referrer_ide=vscode-plugin&plugin_version=0.7.13&toolsets=core,visualizations",
+      "headers": {
+        "DD_API_KEY": "${env:DD_API_KEY}",
+        "DD_APPLICATION_KEY": "${env:DD_APPLICATION_KEY}"
+      }
+    }
+  }
+}
