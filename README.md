@@ -76,7 +76,7 @@ Instead of OAuth, you can authenticate using a Datadog API key and application k
 
 ## Support
 
-- [Datadog MCP Server Documentation](https://docs.datadoghq.com/bits_ai/mcp_server/)
+- [Datadog MCP Server Documentation](https://docs.datadoghq.com/mcp_server/)
 
 ## Legal
 
