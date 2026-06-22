@@ -2,7 +2,7 @@
   "mcpServers": {
     "datadog": {
       "type": "http",
-      "url": "https://not-setup/v1/mcp?referrer_ide=vscode-plugin&plugin_version=0.7.14&toolsets=core,visualizations",
+      "url": "https://not-setup/v1/mcp?referrer_ide=vscode-plugin&plugin_version=0.7.15&toolsets=core,visualizations",
       "headers": {
         "DD_API_KEY": "${env:DD_API_KEY}",
         "DD_APPLICATION_KEY": "${env:DD_APPLICATION_KEY}"

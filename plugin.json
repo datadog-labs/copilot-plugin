@@ -1,6 +1,6 @@
 {
   "name": "datadog",
-  "version": "0.7.14",
+  "version": "0.7.15",
   "description": "Use Datadog directly in VS Code through a preconfigured Datadog MCP server. Query logs, metrics, traces, dashboards, and more through natural conversation. This plugin is in preview.",
   "author": {
     "name": "Datadog"
@@ -13,5 +13,6 @@
     "observability",
     "productivity"
   ],
-  "mcpServers": "./.dd_vscode_mcp.json"
+  "mcpServers": "./.dd_vscode_mcp.json",
+  "skills": "./skills/"
 }
