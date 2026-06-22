@@ -13,5 +13,6 @@
     "observability",
     "productivity"
   ],
-  "mcpServers": "./.dd_vscode_mcp.json"
+  "mcpServers": "./.dd_vscode_mcp.json",
+  "skills": "./skills/"
 }
