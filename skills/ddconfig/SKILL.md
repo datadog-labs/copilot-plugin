@@ -28,6 +28,11 @@ The server is configured but not responding. Read the current domain from the re
 - **Domain issue.** Compare the domain against the site-to-domain table in `mcp-settings.md`. Only flag it as suspicious if it looks like a typo or a clearly malformed URL (e.g. `mcp.us5.datadog.com` missing the `hq`). A domain not in the standard table is not necessarily wrong — the user may be using a valid non-standard domain.
 - **Authentication.** The authentication may have expired or was never completed, and the user needs to follow these steps:
 
+  In Copilot:
+  1. Run the command `/mcp` and select the `datadog` server
+  2. Press `r` to reauthenticate
+
+  In VS Code:
   1. Open the Command Palette (⌘⇧P on Mac or Ctrl+Shift+P on Windows/Linux — show the correct shortcut for the current operating system)
   2. Run the **`MCP: List Servers`** command and select the `datadog` server
   3. Click **Restart Server** — VS Code will prompt for authentication
@@ -61,6 +66,11 @@ Changes the Datadog MCP domain the server connects to.
 
 4. Tell the user the domain has been changed and to follow these steps:
 
+   In Copilot:
+   1. Run the command `/mcp` and select the `datadog` server
+   2. Press `r` to reauthenticate
+
+   In VS Code:
    1. Open the Command Palette (⌘⇧P on Mac or Ctrl+Shift+P on Windows/Linux — show the correct shortcut for the current operating system)
    2. Run the **`MCP: List Servers`** command and select the `datadog` server
    3. Click **Restart Server**
@@ -75,6 +85,11 @@ Ask the user if they want to use an organization on the same domain or on a diff
 - If on the same domain:
   - The user needs to reauthenticate and, during sign-in, choose the target organization in the browser, using the following steps:
 
+    In Copilot:
+    1. Run the command `/mcp` and select the `datadog` server
+    2. Press `r` to reauthenticate
+
+    In VS Code:
     1. Open the Command Palette (⌘⇧P on Mac or Ctrl+Shift+P on Windows/Linux — show the correct shortcut for the current operating system)
     2. Run the **`MCP: List Servers`** command and select the `datadog` server
     3. Click **Restart Server** — VS Code will prompt for authentication; choose the target organization during sign-in
