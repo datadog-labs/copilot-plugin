@@ -1,0 +1,83 @@
+name: Update awesome-copilot
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  update-awesome-copilot:
+    # Skip preview/prerelease builds — only stable releases get bumped
+    if: ${{ !github.event.release.prerelease }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Update Datadog plugin entry in awesome-copilot
+        env:
+          GH_TOKEN: ${{ secrets.AWESOME_COPILOT_PAT }}
+          VERSION: ${{ github.event.release.tag_name }}
+          SHA: ${{ github.event.release.target_commitish }}
+        run: |
+          set -euo pipefail
+
+          # Strip leading 'v' from tag name (e.g. v0.7.15 -> 0.7.15)
+          VERSION="${VERSION#v}"
+          BRANCH="update-datadog-plugin-${VERSION}"
+          UPSTREAM_REPO="github/awesome-copilot"
+          FILE_PATH="plugins/external.json"
+
+          # Fork the upstream repo (no-op if the fork already exists)
+          gh repo fork "${UPSTREAM_REPO}" --clone=false
+
+          # Determine the fork's full name from the authenticated user
+          FORK_OWNER=$(gh api user --jq '.login')
+          FORK_REPO="${FORK_OWNER}/awesome-copilot"
+
+          # Sync the fork's main with upstream before branching
+          gh api "repos/${FORK_REPO}/merge-upstream" \
+            --method POST \
+            -f branch=main
+
+          # Fetch current file content and blob SHA from upstream
+          FILE_JSON=$(gh api "repos/${UPSTREAM_REPO}/contents/${FILE_PATH}")
+          FILE_BLOB_SHA=$(echo "$FILE_JSON" | python3 -c "import sys,json; print(json.load(sys.stdin)['sha'])")
+          FILE_CONTENT=$(echo "$FILE_JSON" | python3 -c "import sys,json,base64; print(base64.b64decode(json.load(sys.stdin)['content']).decode())")
+
+          # Patch the datadog entry's version and source.sha fields
+          UPDATED=$(echo "$FILE_CONTENT" | python3 - <<'PYEOF'
+import sys, json, os
+
+data = json.load(sys.stdin)
+version = os.environ["VERSION"]
+sha = os.environ["SHA"]
+
+for item in data:
+    if item.get("name") == "datadog":
+        item["version"] = version
+        item["source"]["sha"] = sha
+
+print(json.dumps(data, indent=2))
+PYEOF
+)
+
+          # Create a new branch on the fork off its (now-synced) main
+          MAIN_SHA=$(gh api "repos/${FORK_REPO}/git/ref/heads/main" --jq '.object.sha')
+          gh api "repos/${FORK_REPO}/git/refs" \
+            --method POST \
+            -f "ref=refs/heads/${BRANCH}" \
+            -f "sha=${MAIN_SHA}"
+
+          # Commit the patched file to the fork's branch
+          ENCODED=$(echo "$UPDATED" | base64 -w0)
+          gh api "repos/${FORK_REPO}/contents/${FILE_PATH}" \
+            --method PUT \
+            -f "message=Update Datadog plugin to v${VERSION}" \
+            -f "content=${ENCODED}" \
+            -f "sha=${FILE_BLOB_SHA}" \
+            -f "branch=${BRANCH}"
+
+          # Open the PR from the fork to upstream
+          gh pr create \
+            --repo "${UPSTREAM_REPO}" \
+            --title "Update Datadog plugin to v${VERSION}" \
+            --body "Bumps the Datadog plugin to version \`${VERSION}\` (commit \`${SHA}\`) in \`plugins/external.json\`." \
+            --head "${FORK_OWNER}:${BRANCH}" \
+            --base main
