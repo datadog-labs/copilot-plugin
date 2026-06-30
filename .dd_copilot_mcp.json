@@ -2,7 +2,7 @@
   "mcpServers": {
     "datadog": {
       "type": "http",
-      "url": "https://not-setup/v1/mcp?referrer_ide=copilot-plugin&plugin_version=0.7.19&toolsets=core",
+      "url": "https://not-setup/v1/mcp?referrer_ide=copilot-plugin&plugin_version=0.7.20&toolsets=core",
       "headers": {
         "DD_API_KEY": "${env:DD_API_KEY}",
         "DD_APPLICATION_KEY": "${env:DD_APPLICATION_KEY}"
