@@ -63,6 +63,10 @@ Follow these steps in order:
 
 3. **Tell the user** that the Datadog MCP server has been initialized and to follow these steps:
 
+   In Copilot:
+   1. Run the command `/mcp reload`
+
+   In VS Code:
    1. Open the Command Palette (⌘⇧P on Mac or Ctrl+Shift+P on Windows/Linux — show the correct shortcut for the current operating system)
    2. Run the **`MCP: List Servers`** command and select the `datadog` server
    3. Click **Start Server**
