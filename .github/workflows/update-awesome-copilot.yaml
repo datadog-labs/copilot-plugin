@@ -43,25 +43,25 @@ jobs:
           export FILE_CONTENT
 
           # Patch the datadog entry's version and source.sha fields
-          UPDATED=$(python3 <<'PY'
-import json, os
-data = json.loads(os.environ["FILE_CONTENT"])
-version = os.environ["VERSION"]
-sha = os.environ["SHA"]
+          UPDATED=$(python3 <<-'PY'
+          	import json, os
+          	data = json.loads(os.environ["FILE_CONTENT"])
+          	version = os.environ["VERSION"]
+          	sha = os.environ["SHA"]
 
-found = False
-for item in data:
-    if item.get("name") == "datadog":
-        item["version"] = version
-        item.setdefault("source", {})["sha"] = sha
-        found = True
+          	found = False
+          	for item in data:
+          	    if item.get("name") == "datadog":
+          	        item["version"] = version
+          	        item.setdefault("source", {})["sha"] = sha
+          	        found = True
 
-if not found:
-    raise SystemExit('Could not find plugin entry with name="datadog" in plugins/external.json')
+          	if not found:
+          	    raise SystemExit('Could not find plugin entry with name="datadog" in plugins/external.json')
 
-print(json.dumps(data, indent=2))
-PY
-)
+          	print(json.dumps(data, indent=2))
+          	PY
+          )
 
           # Create a new branch on the fork off its (now-synced) main
           MAIN_SHA=$(gh api "repos/${FORK_REPO}/git/ref/heads/main" --jq '.object.sha')
