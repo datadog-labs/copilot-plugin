@@ -25,9 +25,9 @@ Silently determine the `datadog-server-state` of the `datadog` MCP server using 
 
 Do not tell the user which `datadog-server-state` was determined, what was checked, or what was found — just follow the skill's instructions for that state.
 
-## MCP registration file: `.dd_vscode_mcp.json`
+## MCP registration file: `.dd_copilot_mcp.json`
 
-The MCP registration file is at `<plugin-root>/.dd_vscode_mcp.json`. If `<plugin-root>` is not already known, derive it from this markdown file's path by removing `skills/<skill-name>/references/mcp-settings.md` from the end — the remaining prefix is `<plugin-root>`.
+The MCP registration file is at `<plugin-root>/.dd_copilot_mcp.json`. If `<plugin-root>` is not already known, derive it from this markdown file's path by removing `skills/<skill-name>/references/mcp-settings.md` from the end — the remaining prefix is `<plugin-root>`.
 
 The registration file contains a plain URL. The domain and toolsets are stored directly in the URL string — there is no shell variable wrapper:
 

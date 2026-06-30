@@ -90,6 +90,13 @@ Example — reverting to server defaults:
 
 Tell the user the toolsets have been updated including which toolsets are now enabled, and that they need to follow these steps:
 
+In Copilot:
+
+1. Run the command `/mcp` and select the `datadog` server
+2. Press `r` to reauthenticate
+
+In VS Code:
+
 1. Open the Command Palette (⌘⇧P on Mac or Ctrl+Shift+P on Windows/Linux — show the correct shortcut for the current operating system)
 2. Run the **`MCP: List Servers`** command and select the `datadog` server
 3. Click **Restart Server**

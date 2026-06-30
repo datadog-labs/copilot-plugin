@@ -1,11 +1,11 @@
 {
   "name": "datadog",
-  "version": "0.7.15",
-  "description": "Use Datadog directly in VS Code through a preconfigured Datadog MCP server. Query logs, metrics, traces, dashboards, and more through natural conversation. This plugin is in preview.",
+  "version": "0.7.19",
+  "description": "Use Datadog directly in Copilot / VS Code through a preconfigured Datadog MCP server. Query logs, metrics, traces, dashboards, and more through natural conversation. This plugin is in preview.",
   "author": {
     "name": "Datadog"
   },
-  "repository": "https://github.com/datadog-labs/vscode-plugin.git",
+  "repository": "https://github.com/datadog-labs/copilot-plugin.git",
   "keywords": [
     "datadog",
     "infrastructure",
@@ -13,6 +13,6 @@
     "observability",
     "productivity"
   ],
-  "mcpServers": "./.dd_vscode_mcp.json",
+  "mcpServers": "./.dd_copilot_mcp.json",
   "skills": "./skills/"
 }
