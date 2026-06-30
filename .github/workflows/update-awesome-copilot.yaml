@@ -25,7 +25,7 @@ jobs:
           FILE_PATH="plugins/external.json"
 
           # Fork the upstream repo (no-op if the fork already exists)
-          gh repo fork "${UPSTREAM_REPO}" --clone=false
+          gh repo fork "${UPSTREAM_REPO}" --clone=false || true
 
           # Determine the fork's full name from the authenticated user
           FORK_OWNER=$(gh api user --jq '.login')
@@ -34,39 +34,43 @@ jobs:
           # Sync the fork's main with upstream before branching
           gh api "repos/${FORK_REPO}/merge-upstream" \
             --method POST \
-            -f branch=main
+            -f branch=main || true
 
           # Fetch current file content and blob SHA from upstream
           FILE_JSON=$(gh api "repos/${UPSTREAM_REPO}/contents/${FILE_PATH}")
           FILE_BLOB_SHA=$(echo "$FILE_JSON" | python3 -c "import sys,json; print(json.load(sys.stdin)['sha'])")
           FILE_CONTENT=$(echo "$FILE_JSON" | python3 -c "import sys,json,base64; print(base64.b64decode(json.load(sys.stdin)['content']).decode())")
+          export FILE_CONTENT
 
           # Patch the datadog entry's version and source.sha fields
-          UPDATED=$(echo "$FILE_CONTENT" | python3 - <<'PYEOF'
-import sys, json, os
-
-data = json.load(sys.stdin)
+          UPDATED=$(python3 -c '
+import json, os
+data = json.loads(os.environ["FILE_CONTENT"])
 version = os.environ["VERSION"]
 sha = os.environ["SHA"]
 
+found = False
 for item in data:
     if item.get("name") == "datadog":
         item["version"] = version
-        item["source"]["sha"] = sha
+        item.setdefault("source", {})["sha"] = sha
+        found = True
+
+if not found:
+    raise SystemExit("Could not find plugin entry with name=\"datadog\" in plugins/external.json")
 
 print(json.dumps(data, indent=2))
-PYEOF
-)
+')
 
           # Create a new branch on the fork off its (now-synced) main
           MAIN_SHA=$(gh api "repos/${FORK_REPO}/git/ref/heads/main" --jq '.object.sha')
           gh api "repos/${FORK_REPO}/git/refs" \
             --method POST \
             -f "ref=refs/heads/${BRANCH}" \
-            -f "sha=${MAIN_SHA}"
+            -f "sha=${MAIN_SHA}" || true
 
           # Commit the patched file to the fork's branch
-          ENCODED=$(echo "$UPDATED" | base64 -w0)
+          ENCODED=$(printf '%s' "$UPDATED" | base64 -w0)
           gh api "repos/${FORK_REPO}/contents/${FILE_PATH}" \
             --method PUT \
             -f "message=Update Datadog plugin to v${VERSION}" \
