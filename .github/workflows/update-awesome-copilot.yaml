@@ -98,10 +98,12 @@ jobs:
             -f "sha=${FILE_BLOB_SHA}" \
             -f "branch=${BRANCH}"
 
-          # Open the PR from the fork to upstream
-          gh pr create \
-            --repo "${UPSTREAM_REPO}" \
-            --title "Update Datadog plugin to v${VERSION}" \
-            --body "Bumps the Datadog plugin to version \`${VERSION}\` (commit \`${SHA}\`) in \`plugins/external.json\`." \
-            --head "${FORK_OWNER}:${BRANCH}" \
-            --base main
+          # Open the PR from the fork to upstream via REST, not `gh pr create`
+          # (which uses GraphQL — fine-grained PATs don't yet support the
+          # createPullRequest mutation there).
+          gh api "repos/${UPSTREAM_REPO}/pulls" \
+            --method POST \
+            -f "title=Update Datadog plugin to v${VERSION}" \
+            -f "body=Bumps the Datadog plugin to version \`${VERSION}\` (commit \`${SHA}\`) in \`plugins/external.json\`." \
+            -f "head=${FORK_OWNER}:${BRANCH}" \
+            -f "base=main"
