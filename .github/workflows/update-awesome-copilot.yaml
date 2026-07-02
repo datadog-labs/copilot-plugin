@@ -71,12 +71,23 @@ jobs:
           	PY
           )
 
-          # Create a new branch on the fork off its (now-synced) main
+          # Create the branch on the fork off its (now-synced) main, or reset
+          # it to that tip if it already exists from a previous run.
           MAIN_SHA=$(gh api "repos/${FORK_REPO}/git/ref/heads/main" --jq '.object.sha')
-          gh api "repos/${FORK_REPO}/git/refs" \
+          if ! gh api "repos/${FORK_REPO}/git/refs" \
             --method POST \
             -f "ref=refs/heads/${BRANCH}" \
-            -f "sha=${MAIN_SHA}" || true
+            -f "sha=${MAIN_SHA}" 2>/dev/null; then
+            gh api "repos/${FORK_REPO}/git/refs/heads/${BRANCH}" \
+              --method PATCH \
+              -f "sha=${MAIN_SHA}" \
+              -F "force=true"
+          fi
+
+          # Re-fetch the file's blob SHA from the branch we're about to write
+          # to, since it may already exist with content that differs from
+          # upstream main's (e.g. after the reset above).
+          FILE_BLOB_SHA=$(gh api "repos/${FORK_REPO}/contents/${FILE_PATH}?ref=${BRANCH}" --jq '.sha')
 
           # Commit the patched file to the fork's branch
           ENCODED=$(printf '%s' "$UPDATED" | base64 -w0)
