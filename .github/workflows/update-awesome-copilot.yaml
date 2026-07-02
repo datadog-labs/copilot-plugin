@@ -67,7 +67,7 @@ jobs:
           	if not found:
           	    raise SystemExit('Could not find plugin entry with name="datadog" in plugins/external.json')
 
-          	print(json.dumps(data, indent=2))
+          	print(json.dumps(data, indent=2, ensure_ascii=False))
           	PY
           )
 
