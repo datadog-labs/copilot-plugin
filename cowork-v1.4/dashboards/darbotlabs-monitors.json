@@ -1,0 +1,103 @@
+[
+  {
+    "name": "[Darbotlabs] HP11D stopped reporting",
+    "type": "service check",
+    "query": "\"datadog.agent.up\".over(\"host:hp11d\").by(\"host\").last(2).count_by_status()",
+    "message": "HP11D Datadog Agent has not reported for 10 minutes. Check the Datadog Agent Manager service on HP11D. @REPLACE-WITH-ALERT-RECIPIENT",
+    "options": {
+      "thresholds": {
+        "critical": 2,
+        "ok": 1
+      },
+      "notify_no_data": true,
+      "no_data_timeframe": 10
+    },
+    "tags": [
+      "team:darbotlabs"
+    ],
+    "priority": 2
+  },
+  {
+    "name": "[Darbotlabs] HP11D disk above 85%",
+    "type": "metric alert",
+    "query": "max(last_15m):max:system.disk.in_use{host:hp11d} by {device} * 100 > 85",
+    "message": "Disk {{device.name}} on HP11D is {{value}}% full. @REPLACE-WITH-ALERT-RECIPIENT",
+    "options": {
+      "thresholds": {
+        "critical": 85,
+        "warning": 75
+      },
+      "notify_no_data": false
+    },
+    "tags": [
+      "team:darbotlabs"
+    ],
+    "priority": 3
+  },
+  {
+    "name": "[Darbotlabs] GitHub Copilot daily active users dropped",
+    "type": "metric alert",
+    "query": "pct_change(avg(last_1d),last_1w):sum:github_copilot.usage.organizations.daily_active_users{*} < -50",
+    "message": "GitHub Copilot daily active users fell more than 50% week over week. @REPLACE-WITH-ALERT-RECIPIENT",
+    "options": {
+      "thresholds": {
+        "critical": -50
+      },
+      "notify_no_data": false
+    },
+    "tags": [
+      "team:darbotlabs"
+    ],
+    "priority": 4
+  },
+  {
+    "name": "[Darbotlabs] GitHub Copilot seats inactive this cycle",
+    "type": "metric alert",
+    "query": "max(last_1d):sum:github_copilot.organizations.billing.seats.inactive_this_cycle{*} > 5",
+    "message": "{{value}} GitHub Copilot seats have not been used this billing cycle. Consider reassigning. @REPLACE-WITH-ALERT-RECIPIENT",
+    "options": {
+      "thresholds": {
+        "critical": 5,
+        "warning": 2
+      },
+      "notify_no_data": false
+    },
+    "tags": [
+      "team:darbotlabs"
+    ],
+    "priority": 5
+  },
+  {
+    "name": "[Darbotlabs] Datadog MCP tool-call burst",
+    "type": "metric alert",
+    "query": "sum(last_10m):count:datadog.mcp.tool.usage{*}.as_count() > 40",
+    "message": "More than 40 MCP tool calls in 10 minutes (Datadog fair-use burst limit is 50/10s, monthly 100k). Check Top users on the MCP Usage dashboard. @REPLACE-WITH-ALERT-RECIPIENT",
+    "options": {
+      "thresholds": {
+        "critical": 40,
+        "warning": 25
+      },
+      "notify_no_data": false
+    },
+    "tags": [
+      "team:darbotlabs"
+    ],
+    "priority": 4
+  },
+  {
+    "name": "[Darbotlabs] New GitHub security advisory or Dependabot alert",
+    "type": "event-v2 alert",
+    "query": "events(\"source:github (dependabot OR security_advisory OR vulnerability)\").rollup(\"count\").last(\"1h\") > 0",
+    "message": "New GitHub security event received. Review in the GitHub Activity & Security dashboard. @REPLACE-WITH-ALERT-RECIPIENT",
+    "options": {
+      "thresholds": {
+        "critical": 0
+      },
+      "notify_no_data": false
+    },
+    "tags": [
+      "team:darbotlabs"
+    ],
+    "priority": 3
+  }
+]

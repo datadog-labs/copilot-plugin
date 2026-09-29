@@ -1,0 +1,46 @@
+{
+  "source": "https://docs.datadoghq.com/mcp_server/tools/",
+  "captured": "2026-09-28",
+  "note": "Names, permissions and descriptions from Datadog's official MCP Server Tools reference. Cowork discovers the live tool list from the server; this catalog is reference material for the skills, not a substitute for tools/list.",
+  "sites": {
+    "us1": {"site": "datadoghq.com", "mcp": "https://mcp.datadoghq.com/v1/mcp", "app": "https://app.datadoghq.com", "confirmed": true},
+    "us3": {"site": "us3.datadoghq.com", "mcp": "https://mcp.us3.datadoghq.com/v1/mcp", "app": "https://us3.datadoghq.com", "confirmed": true},
+    "us5": {"site": "us5.datadoghq.com", "mcp": "https://mcp.us5.datadoghq.com/v1/mcp", "app": "https://us5.datadoghq.com", "confirmed": true},
+    "eu1": {"site": "datadoghq.eu", "mcp": "https://mcp.datadoghq.eu/v1/mcp", "app": "https://app.datadoghq.eu", "confirmed": true},
+    "ap1": {"site": "ap1.datadoghq.com", "mcp": "https://mcp.ap1.datadoghq.com/v1/mcp", "app": "https://ap1.datadoghq.com", "confirmed": true},
+    "ap2": {"site": "ap2.datadoghq.com", "mcp": "https://mcp.ap2.datadoghq.com/v1/mcp", "app": "https://ap2.datadoghq.com", "confirmed": true},
+    "uk1": {"site": "uk1.datadoghq.com", "mcp": "https://mcp.uk1.datadoghq.com/v1/mcp", "app": "https://uk1.datadoghq.com", "confirmed": false, "note": "Derived from Datadog's 'prepend mcp. to your site' rule; not listed in the six documented commercial MCP endpoints. Verify before use."}
+  },
+  "write_tools_in_core": ["create_datadog_notebook", "edit_datadog_notebook", "upsert_datadog_dashboard"],
+  "tools": [
+    {"name": "search_datadog_hosts", "access": "read", "permissions": "Hosts Read, Timeseries", "description": "Lists and provides information about monitored hosts, supporting filtering and searching."},
+    {"name": "search_datadog_metrics", "access": "read", "permissions": "Metrics", "description": "Lists available metrics, with options for filtering and metadata."},
+    {"name": "get_datadog_metric_context", "access": "read", "permissions": "Metrics (or Cloud Cost Management Read)", "description": "Retrieves metric metadata, available tags and tag values for filtering and grouping."},
+    {"name": "get_datadog_metric", "access": "read", "permissions": "Metrics or Timeseries (or Cloud Cost Management Read)", "description": "Queries and analyzes historical or real-time metric data, supporting custom queries and aggregations."},
+    {"name": "search_datadog_monitors", "access": "read", "permissions": "Monitors Read", "description": "Retrieves monitors including statuses, thresholds and alert conditions."},
+    {"name": "search_datadog_events", "access": "read", "permissions": "Events, Timeseries", "description": "Searches events such as monitor alerts, deployments, infrastructure changes, security findings and service status changes."},
+    {"name": "search_datadog_incidents", "access": "read", "permissions": "Incidents Read", "description": "Lists incidents including state, severity and metadata."},
+    {"name": "get_datadog_incident", "access": "read", "permissions": "Incidents Read", "description": "Retrieves detailed information about an incident (timeline data not included)."},
+    {"name": "search_datadog_dashboards", "access": "read", "permissions": "Dashboards Read, User Access Read", "description": "Lists available dashboards and key details; limited detail about contents."},
+    {"name": "get_datadog_dashboard", "access": "read", "permissions": "Dashboards Read, User Access Read", "description": "Retrieves a dashboard by ID with title, description, tags and widgets."},
+    {"name": "search_datadog_logs", "access": "read", "permissions": "Logs Read Data, Logs Read Index Data", "description": "Searches logs with filters (time, query, service, host, storage tier) and returns log details."},
+    {"name": "analyze_datadog_logs", "access": "read", "permissions": "Logs Read Data, Logs Read Index Data, Timeseries", "description": "Analyzes logs with SQL for counting, aggregation and numerical analysis."},
+    {"name": "search_datadog_spans", "access": "read", "permissions": "APM Read", "description": "Retrieves APM spans with filters such as service, time and resource."},
+    {"name": "get_datadog_trace", "access": "read", "permissions": "APM Read", "description": "Fetches a complete trace by trace ID; very large traces may be truncated."},
+    {"name": "search_datadog_entities", "access": "read", "permissions": "Service Catalog Read", "description": "Searches the Software Catalog for service identity, ownership and upstream/downstream dependencies."},
+    {"name": "search_datadog_notebooks", "access": "read", "permissions": "Notebooks Read", "description": "Lists and searches notebooks by author, tags and content."},
+    {"name": "get_datadog_notebook", "access": "read", "permissions": "Notebooks Read", "description": "Retrieves a notebook by ID including name, status and author."},
+    {"name": "search_datadog_rum_events", "access": "read", "permissions": "RUM Apps Read", "description": "Searches RUM events using advanced query syntax."},
+    {"name": "aggregate_rum_events", "access": "read", "permissions": "RUM Apps Read", "description": "Aggregates RUM events (counts, averages, percentiles) with grouping."},
+    {"name": "create_datadog_notebook", "access": "write", "permissions": "Notebooks Read, Notebooks Write", "description": "Creates a new notebook."},
+    {"name": "edit_datadog_notebook", "access": "write", "permissions": "Notebooks Read, Notebooks Write", "description": "Edits an existing notebook."},
+    {"name": "upsert_datadog_dashboard", "access": "write", "permissions": "Dashboards Read, Dashboards Write", "description": "Creates or updates a dashboard."}
+  ],
+  "optional_toolsets": {
+    "alerting": ["validate_datadog_monitor", "get_datadog_monitor_templates", "search_datadog_monitor_groups", "search_datadog_slos", "get_monitor_coverage", "create_datadog_monitor"],
+    "llmobs": "Agent Observability spans and experiments (LLM/agent traces).",
+    "audit-trail": ["search_audit_events", "list_audit_events", "build_audit_trail_query"],
+    "error-tracking": ["search_datadog_error_tracking_issues", "get_datadog_error_tracking_issue", "analyze_datadog_error_tracking_errors"],
+    "ddsql": ["ddsql_get_spec", "ddsql_schema_search_tables", "ddsql_run_query"]
+  }
+}

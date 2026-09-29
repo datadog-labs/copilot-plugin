@@ -1,0 +1,452 @@
+{
+  "title": "Darbotlabs - HP11D Infrastructure (Datadog Agent 7.83)",
+  "description": "Live host telemetry from the Datadog Agent on HP11D (Windows 11 Pro Insider). Add hosts by widening the $host template variable.",
+  "layout_type": "ordered",
+  "widgets": [
+    {
+      "definition": {
+        "title": "At a glance",
+        "type": "group",
+        "layout_type": "ordered",
+        "background_color": "vivid_blue",
+        "widgets": [
+          {
+            "definition": {
+              "title": "CPU busy %",
+              "type": "query_value",
+              "requests": [
+                {
+                  "q": "avg:system.cpu.user{$host}+avg:system.cpu.system{$host}",
+                  "aggregator": "last"
+                }
+              ],
+              "autoscale": true,
+              "precision": 1
+            }
+          },
+          {
+            "definition": {
+              "title": "Memory used %",
+              "type": "query_value",
+              "requests": [
+                {
+                  "q": "100-avg:system.mem.pct_usable{$host}*100",
+                  "aggregator": "last"
+                }
+              ],
+              "autoscale": true,
+              "precision": 1
+            }
+          },
+          {
+            "definition": {
+              "title": "Disk in use % (max volume)",
+              "type": "query_value",
+              "requests": [
+                {
+                  "q": "max:system.disk.in_use{$host}*100",
+                  "aggregator": "last"
+                }
+              ],
+              "autoscale": true,
+              "precision": 1
+            }
+          },
+          {
+            "definition": {
+              "title": "Uptime (h)",
+              "type": "query_value",
+              "requests": [
+                {
+                  "q": "max:system.uptime{$host}/3600",
+                  "aggregator": "last"
+                }
+              ],
+              "autoscale": true,
+              "precision": 1
+            }
+          },
+          {
+            "definition": {
+              "title": "Processes",
+              "type": "query_value",
+              "requests": [
+                {
+                  "q": "max:system.proc.count{$host}",
+                  "aggregator": "last"
+                }
+              ],
+              "autoscale": true,
+              "precision": 0
+            }
+          },
+          {
+            "definition": {
+              "title": "Clock offset (s)",
+              "type": "query_value",
+              "requests": [
+                {
+                  "q": "avg:ntp.offset{$host}",
+                  "aggregator": "last"
+                }
+              ],
+              "autoscale": true,
+              "precision": 2
+            }
+          },
+          {
+            "definition": {
+              "title": "Host map",
+              "type": "hostmap",
+              "requests": {
+                "fill": {
+                  "q": "avg:system.cpu.user{*}+avg:system.cpu.system{*}"
+                }
+              },
+              "node_type": "host",
+              "no_metric_hosts": true,
+              "no_group_hosts": true,
+              "scope": [
+                "$host"
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "definition": {
+        "title": "CPU & memory",
+        "type": "group",
+        "layout_type": "ordered",
+        "background_color": "vivid_blue",
+        "widgets": [
+          {
+            "definition": {
+              "title": "CPU breakdown",
+              "type": "timeseries",
+              "requests": [
+                {
+                  "q": "avg:system.cpu.user{$host}",
+                  "display_type": "area",
+                  "style": {
+                    "palette": "dog_classic",
+                    "line_type": "solid",
+                    "line_width": "normal"
+                  }
+                },
+                {
+                  "q": "avg:system.cpu.system{$host}",
+                  "display_type": "area",
+                  "style": {
+                    "palette": "dog_classic",
+                    "line_type": "solid",
+                    "line_width": "normal"
+                  }
+                },
+                {
+                  "q": "avg:system.cpu.iowait{$host}",
+                  "display_type": "area",
+                  "style": {
+                    "palette": "dog_classic",
+                    "line_type": "solid",
+                    "line_width": "normal"
+                  }
+                },
+                {
+                  "q": "avg:system.cpu.idle{$host}",
+                  "display_type": "area",
+                  "style": {
+                    "palette": "dog_classic",
+                    "line_type": "solid",
+                    "line_width": "normal"
+                  }
+                }
+              ],
+              "show_legend": true,
+              "legend_layout": "auto"
+            }
+          },
+          {
+            "definition": {
+              "title": "Load (1/5/15)",
+              "type": "timeseries",
+              "requests": [
+                {
+                  "q": "avg:system.load.1{$host}",
+                  "display_type": "line",
+                  "style": {
+                    "palette": "dog_classic",
+                    "line_type": "solid",
+                    "line_width": "normal"
+                  }
+                },
+                {
+                  "q": "avg:system.load.5{$host}",
+                  "display_type": "line",
+                  "style": {
+                    "palette": "dog_classic",
+                    "line_type": "solid",
+                    "line_width": "normal"
+                  }
+                },
+                {
+                  "q": "avg:system.load.15{$host}",
+                  "display_type": "line",
+                  "style": {
+                    "palette": "dog_classic",
+                    "line_type": "solid",
+                    "line_width": "normal"
+                  }
+                }
+              ],
+              "show_legend": true,
+              "legend_layout": "auto"
+            }
+          },
+          {
+            "definition": {
+              "title": "Memory used vs total (bytes)",
+              "type": "timeseries",
+              "requests": [
+                {
+                  "q": "avg:system.mem.used{$host}",
+                  "display_type": "line",
+                  "style": {
+                    "palette": "dog_classic",
+                    "line_type": "solid",
+                    "line_width": "normal"
+                  }
+                },
+                {
+                  "q": "avg:system.mem.total{$host}",
+                  "display_type": "line",
+                  "style": {
+                    "palette": "dog_classic",
+                    "line_type": "solid",
+                    "line_width": "normal"
+                  }
+                }
+              ],
+              "show_legend": true,
+              "legend_layout": "auto"
+            }
+          },
+          {
+            "definition": {
+              "title": "Page file / swap used",
+              "type": "timeseries",
+              "requests": [
+                {
+                  "q": "avg:system.swap.used{$host}",
+                  "display_type": "line",
+                  "style": {
+                    "palette": "dog_classic",
+                    "line_type": "solid",
+                    "line_width": "normal"
+                  }
+                }
+              ],
+              "show_legend": true,
+              "legend_layout": "auto"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "definition": {
+        "title": "Disk & network",
+        "type": "group",
+        "layout_type": "ordered",
+        "background_color": "vivid_green",
+        "widgets": [
+          {
+            "definition": {
+              "title": "Disk in use by device",
+              "type": "timeseries",
+              "requests": [
+                {
+                  "q": "avg:system.disk.in_use{$host} by {device}*100",
+                  "display_type": "line",
+                  "style": {
+                    "palette": "dog_classic",
+                    "line_type": "solid",
+                    "line_width": "normal"
+                  }
+                }
+              ],
+              "show_legend": true,
+              "legend_layout": "auto"
+            }
+          },
+          {
+            "definition": {
+              "title": "Disk read/write bytes",
+              "type": "timeseries",
+              "requests": [
+                {
+                  "q": "avg:system.io.r_s{$host} by {device}",
+                  "display_type": "line",
+                  "style": {
+                    "palette": "dog_classic",
+                    "line_type": "solid",
+                    "line_width": "normal"
+                  }
+                },
+                {
+                  "q": "avg:system.io.w_s{$host} by {device}",
+                  "display_type": "line",
+                  "style": {
+                    "palette": "dog_classic",
+                    "line_type": "solid",
+                    "line_width": "normal"
+                  }
+                }
+              ],
+              "show_legend": true,
+              "legend_layout": "auto"
+            }
+          },
+          {
+            "definition": {
+              "title": "Network bytes in/out",
+              "type": "timeseries",
+              "requests": [
+                {
+                  "q": "avg:system.net.bytes_rcvd{$host} by {device}",
+                  "display_type": "area",
+                  "style": {
+                    "palette": "dog_classic",
+                    "line_type": "solid",
+                    "line_width": "normal"
+                  }
+                },
+                {
+                  "q": "avg:system.net.bytes_sent{$host} by {device}",
+                  "display_type": "area",
+                  "style": {
+                    "palette": "dog_classic",
+                    "line_type": "solid",
+                    "line_width": "normal"
+                  }
+                }
+              ],
+              "show_legend": true,
+              "legend_layout": "auto"
+            }
+          },
+          {
+            "definition": {
+              "title": "TCP connections",
+              "type": "timeseries",
+              "requests": [
+                {
+                  "q": "avg:system.net.tcp.current_established{$host}",
+                  "display_type": "line",
+                  "style": {
+                    "palette": "dog_classic",
+                    "line_type": "solid",
+                    "line_width": "normal"
+                  }
+                }
+              ],
+              "show_legend": true,
+              "legend_layout": "auto"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "definition": {
+        "title": "Agent health",
+        "type": "group",
+        "layout_type": "ordered",
+        "background_color": "gray",
+        "widgets": [
+          {
+            "definition": {
+              "title": "Agent running / checks",
+              "type": "timeseries",
+              "requests": [
+                {
+                  "q": "max:datadog.agent.running{$host}",
+                  "display_type": "line",
+                  "style": {
+                    "palette": "dog_classic",
+                    "line_type": "solid",
+                    "line_width": "normal"
+                  }
+                },
+                {
+                  "q": "sum:datadog.agent.check_status{$host}.as_count()",
+                  "display_type": "line",
+                  "style": {
+                    "palette": "dog_classic",
+                    "line_type": "solid",
+                    "line_width": "normal"
+                  }
+                }
+              ],
+              "show_legend": true,
+              "legend_layout": "auto"
+            }
+          },
+          {
+            "definition": {
+              "title": "NTP offset",
+              "type": "timeseries",
+              "requests": [
+                {
+                  "q": "avg:ntp.offset{$host}",
+                  "display_type": "line",
+                  "style": {
+                    "palette": "dog_classic",
+                    "line_type": "solid",
+                    "line_width": "normal"
+                  }
+                }
+              ],
+              "show_legend": true,
+              "legend_layout": "auto"
+            }
+          },
+          {
+            "definition": {
+              "title": "Agent & monitor events for this host",
+              "type": "event_stream",
+              "query": "host:hp11d",
+              "event_size": "s",
+              "tags_execution": "and"
+            }
+          },
+          {
+            "definition": {
+              "type": "note",
+              "content": "No APM traces, logs or LLM Observability spans are configured on HP11D yet; those panels are intentionally absent rather than faked.",
+              "background_color": "gray",
+              "font_size": "14",
+              "text_align": "left",
+              "show_tick": false
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "template_variables": [
+    {
+      "name": "host",
+      "prefix": "host",
+      "available_values": [],
+      "default": "*"
+    }
+  ],
+  "notify_list": [],
+  "reflow_type": "auto",
+  "tags": [
+    "team:darbotlabs",
+    "managed-by:cowork-plugin"
+  ]
+}
