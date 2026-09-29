@@ -1,0 +1,489 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/dayour/datadog-agent-plugin/runbook/schema/module.schema.json",
+  "title": "Runbook module",
+  "description": "One composable unit of configuration (usually one integration). A module declares prerequisites, ordered steps, the Datadog resources it owns, how to verify it, and how to roll it back.",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "id",
+    "title",
+    "version",
+    "status",
+    "summary",
+    "systems",
+    "steps",
+    "resources",
+    "verification",
+    "rollback"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "schemaVersion": {
+      "enum": [
+        "1.0",
+        "1.1"
+      ]
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$"
+    },
+    "title": {
+      "type": "string"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "status": {
+      "$ref": "#/$defs/status"
+    },
+    "summary": {
+      "type": "string"
+    },
+    "dependsOn": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "systems": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "datadog",
+          "azure",
+          "entra",
+          "m365",
+          "github",
+          "powerplatform",
+          "windows-host",
+          "local"
+        ]
+      },
+      "minItems": 1
+    },
+    "datadogIntegrations": {
+      "type": "array",
+      "description": "Integration tiles this module relies on (catalog slug + display name).",
+      "items": {
+        "type": "object",
+        "required": [
+          "slug",
+          "name"
+        ],
+        "properties": {
+          "slug": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "dataTypes": {
+            "type": "array",
+            "items": {
+              "enum": [
+                "metrics",
+                "logs",
+                "events",
+                "traces",
+                "ci",
+                "security",
+                "source-code"
+              ]
+            }
+          },
+          "metricPrefixes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "logSources": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "parameters": {
+      "type": "array",
+      "description": "Manifest parameter names this module consumes.",
+      "items": {
+        "type": "string"
+      }
+    },
+    "prerequisites": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "description"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "check": {
+            "$ref": "#/$defs/check"
+          },
+          "state": {
+            "enum": [
+              "unknown",
+              "met",
+              "unmet",
+              "not-applicable"
+            ]
+          }
+        }
+      }
+    },
+    "steps": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/step"
+      },
+      "minItems": 1
+    },
+    "resources": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/resource"
+      }
+    },
+    "verification": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/check"
+      }
+    },
+    "rollback": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "findings": {
+      "type": "array",
+      "description": "Facts discovered while applying this module (gaps, blockers, surprises) that the next operator should know.",
+      "items": {
+        "type": "object",
+        "required": [
+          "date",
+          "text"
+        ],
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "severity": {
+            "enum": [
+              "info",
+              "warn",
+              "blocker"
+            ]
+          },
+          "text": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "docs": {
+      "type": "object",
+      "description": "Human docs for the module README (rendered by tools/docs.mjs).",
+      "properties": {
+        "overview": {
+          "type": "string"
+        },
+        "architecture": {
+          "type": "string"
+        },
+        "dataSources": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "troubleshooting": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "symptom",
+              "fix"
+            ],
+            "properties": {
+              "symptom": {
+                "type": "string"
+              },
+              "fix": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "references": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "coworkSkill": {
+      "type": "string",
+      "description": "Folder of the Cowork agent skill that operates this module (cowork/appPackage/skills/<name>)."
+    },
+    "envKeys": {
+      "type": "array",
+      "description": "Manifest parameter names this module needs in .env (beyond datadog basics).",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "$defs": {
+    "status": {
+      "enum": [
+        "planned",
+        "in-progress",
+        "applied",
+        "verified",
+        "blocked",
+        "skipped"
+      ]
+    },
+    "step": {
+      "type": "object",
+      "required": [
+        "id",
+        "title",
+        "system",
+        "actor",
+        "method",
+        "instructions"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9.-]*$"
+        },
+        "title": {
+          "type": "string"
+        },
+        "system": {
+          "enum": [
+            "datadog",
+            "azure",
+            "entra",
+            "m365",
+            "github",
+            "powerplatform",
+            "windows-host",
+            "local"
+          ]
+        },
+        "actor": {
+          "enum": [
+            "claude",
+            "user",
+            "either"
+          ],
+          "description": "user = a human must do it (credentials, consent, OAuth, billing)."
+        },
+        "method": {
+          "enum": [
+            "ui",
+            "cli",
+            "api",
+            "resource",
+            "manual"
+          ],
+          "description": "resource = apply a file from resources[] (UI JSON import or API)."
+        },
+        "requiresApproval": {
+          "type": "boolean",
+          "default": false
+        },
+        "costImpact": {
+          "enum": [
+            "none",
+            "low",
+            "medium",
+            "high"
+          ],
+          "default": "none"
+        },
+        "uiPath": {
+          "type": "string",
+          "description": "Datadog/portal URL path or breadcrumb."
+        },
+        "command": {
+          "type": "string",
+          "description": "CLI command; parameters as ${name}. Never contains secrets."
+        },
+        "resourceRef": {
+          "type": "string",
+          "description": "id of an entry in resources[]"
+        },
+        "instructions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1
+        },
+        "verify": {
+          "$ref": "#/$defs/check"
+        },
+        "status": {
+          "$ref": "#/$defs/status"
+        }
+      }
+    },
+    "resource": {
+      "type": "object",
+      "required": [
+        "id",
+        "kind",
+        "file",
+        "title"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]*$"
+        },
+        "kind": {
+          "enum": [
+            "dashboard",
+            "monitor",
+            "slo",
+            "log_pipeline",
+            "log_index",
+            "log_metric",
+            "synthetics_test",
+            "notebook",
+            "team",
+            "workflow"
+          ]
+        },
+        "title": {
+          "type": "string",
+          "description": "Exact Datadog title/name; used as the idempotency key."
+        },
+        "file": {
+          "type": "string",
+          "description": "Path relative to the module dir; a Datadog public-API payload with ${param} placeholders (not {{ }}, which Datadog uses for monitor template variables)."
+        },
+        "api": {
+          "type": "string",
+          "description": "Datadog API endpoint used by the apply engine, e.g. POST /api/v1/dashboard"
+        },
+        "applyVia": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "ui-import",
+              "api"
+            ]
+          }
+        },
+        "origin": {
+          "enum": [
+            "adopted",
+            "authored"
+          ],
+          "description": "adopted = the file is the verbatim (templated) export of an object that already existed (lives in adopted/); authored = written by this runbook (lives in resources/). Exactly one resource per Datadog object."
+        },
+        "baseline": {
+          "type": "string",
+          "description": "For an authored resource that extends an existing object: path (relative to the module dir) of the adopted export used as the rollback baseline."
+        },
+        "supersedes": {
+          "type": "string",
+          "description": "Deprecated in schema 1.1: use one resource per object plus baseline."
+        },
+        "envKey": {
+          "type": "string",
+          "pattern": "^DD_ID_[A-Z0-9_]+$",
+          "description": "Env key holding this object's Datadog id; always DD_ID_<ID uppercased>."
+        },
+        "dataReady": {
+          "type": "boolean",
+          "description": "false = the resource will show No Data until upstream data flows."
+        },
+        "datadogId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Filled after apply (per run)."
+        },
+        "url": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "check": {
+      "type": "object",
+      "required": [
+        "id",
+        "kind",
+        "description"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "metric_query",
+            "log_query",
+            "api_get",
+            "cli",
+            "ui_check",
+            "manual"
+          ]
+        },
+        "description": {
+          "type": "string"
+        },
+        "query": {
+          "type": "string"
+        },
+        "window": {
+          "type": "string",
+          "examples": [
+            "1h",
+            "24h",
+            "7d"
+          ]
+        },
+        "expect": {
+          "type": "string",
+          "description": "Human-readable pass condition, e.g. 'at least one series', 'count > 0'."
+        }
+      }
+    }
+  }
+}

@@ -2,3 +2,11 @@ cowork/appPackage/build/
 cowork/env/.env.*
 !cowork/env/.env.dev.example
 .playwright-mcp/
+# Datadog observability runbook: environment values, rendered payloads and run evidence stay local
+runbook/.env
+runbook/*.env
+!runbook/.env.example
+runbook/build/
+runbook/runs/*
+!runbook/runs/README.md
+runbook/node_modules/

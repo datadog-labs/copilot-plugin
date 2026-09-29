@@ -1,0 +1,16 @@
+Independent community integration maintained as a dayour project.
+Not an official Datadog, GitHub, Microsoft, or Cursor product or endorsement.
+Product names and trademarks belong to their respective owners.
+
+These packages and helpers are original MIT-licensed work. No upstream
+plugin implementation or licensed README text was copied.
+
+The Datadog copilot-plugin README was a design reference only:
+https://github.com/datadog-labs/copilot-plugin
+That separate upstream README identifies its license as Apache-2.0.
+
+Integration destination:
+https://github.com/dayour/datadog-agent-plugin
+Imported on 2026-09-29 under cowork/dcr-connector/ as standalone sources (release
+0.1.0). They are not a patch against the repository's existing cowork/ package
+and have not been installed in a client.

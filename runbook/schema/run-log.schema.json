@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://darbotlabs/schemas/datadog-runbook/run-log.schema.json",
+  "title": "Runbook execution log entry",
+  "description": "One JSON object per line in runs/<date>/run-log.jsonl. Append-only record of what an operator (human or Claude) actually did.",
+  "type": "object",
+  "required": ["ts", "module", "step", "actor", "action", "result"],
+  "additionalProperties": false,
+  "properties": {
+    "ts": { "type": "string", "format": "date-time" },
+    "module": { "type": "string" },
+    "step": { "type": "string", "description": "step id from the module, or 'scout' / 'verify.<id>'" },
+    "actor": { "enum": ["claude", "user"] },
+    "action": { "type": "string" },
+    "result": { "enum": ["success", "failed", "skipped", "blocked", "info"] },
+    "details": { "type": "string" },
+    "datadog": {
+      "type": "object",
+      "properties": {
+        "kind": { "type": "string" },
+        "id": { "type": "string" },
+        "url": { "type": "string" }
+      }
+    },
+    "evidence": { "type": "array", "items": { "type": "string" } }
+  }
+}

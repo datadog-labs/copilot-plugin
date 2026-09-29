@@ -1,0 +1,94 @@
+{
+  "release": "0.1.0",
+  "date": "2026-09-24",
+  "offline": {
+    "status": "current-source-full-suite-passed-with-runtime-skips",
+    "command": "python3 -B -m unittest discover -s tests -v",
+    "unit_tests": 88,
+    "passed": 85,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 3,
+    "skip_reason": "PowerShell runtime unavailable; three script-execution tests were not run."
+  },
+  "validation_scope": "Strict project-specific subset of AgentPlugins 1.0 and local Cowork candidate shape; authoritative Microsoft and AgentPlugins JSON Schemas and live OAuth were not executed.",
+  "archives": {
+    "status": "built-and-verified",
+    "member_counts": {
+      "datadog-connection-copilot-cli-0.1.0.zip": 19,
+      "datadog-connection-vscode-0.1.0.zip": 21,
+      "datadog-connection-cursor-0.1.0.zip": 20,
+      "datadog-connection-cowork-dcr-connector-0.1.0.zip": 12,
+      "datadog-connection-source-0.1.0.zip": 45
+    }
+  },
+  "powershell": {
+    "runtime": "not-installed-in-build-environment",
+    "static_guard_tests": "passed",
+    "offline_fixture_execution": "not-run",
+    "Windows_PowerShell_5_1_and_PowerShell_7_execution": "unverified"
+  },
+  "dynamic_client_registration": {
+    "public_metadata_observation": {
+      "source": "User-reported public web fetch, 2026-09-24; not a PowerShell live probe",
+      "authorization_server": {
+        "issuer": "https://mcp.datadoghq.com",
+        "authorization_endpoint": "https://mcp.datadoghq.com/api/unstable/mcp-server/authorize",
+        "token_endpoint": "https://mcp.datadoghq.com/api/unstable/mcp-server/token",
+        "grant_types_supported": ["authorization_code", "refresh_token"],
+        "code_challenge_methods_supported": ["S256"],
+        "pkce_required": true,
+        "registration_endpoint": "https://mcp.datadoghq.com/api/unstable/mcp-server/register",
+        "token_endpoint_auth_methods_supported": [
+          "client_secret_basic", "client_secret_post", "none"
+        ]
+      },
+      "protected_resource_metadata": {
+        "root_web_fetch": "No fetch results found",
+        "endpoint_specific_web_fetch": "No fetch results found",
+        "http_status_observed": null,
+        "conclusion": "inconclusive; not evidence of HTTP 404"
+      }
+    },
+    "read_only_script_live_probe": "not-run",
+    "diagnostic_client_creation": "not-run",
+    "Microsoft_client_secret_issuance": "unverified",
+    "advertised_auth_methods_prove_secret_issuance": false,
+    "Microsoft_Enterprise_token_store": "not-provisioned-or-tested"
+  },
+  "cowork": {
+    "status": "dcr-connector-builder-not-upload-ready",
+    "candidate_builder": "Guided offline wizard and explicit flags tested with synthetic publisher inputs; real publisher inputs absent.",
+    "connector_format": "Microsoft 365 Unified App Manifest v1.28 candidate, direct Datadog US1 MCP, Cowork-only authorization omitted.",
+    "consent_observation": "A Datadog UI showed Limited with 88 read tools and no writes versus Full with 88 reads, 68 writes and sensitive actions; those observed counts may change and do not establish direct Cowork authentication.",
+    "read_only_recommendation": "Choose Limited if offered; use a Datadog role with mcp_read and required resource reads without mcp_write.",
+    "vendor_profile_enforced_by_manifest": false,
+    "auth_paths": {
+      "DCR_first": "Cowork-only manifest omits authorization; protected-resource metadata and secret issuance remain unverified.",
+      "static_OAuth_conditional": "Requires a real Datadog OAuth client, allowlisted Microsoft Teams callback, and an Enterprise token-store auth config plus real OAuthPluginVault reference created by supported Microsoft tooling; none was provisioned."
+    },
+    "tenant_upload_and_authenticated_use": "not-run"
+  },
+  "live_acceptance": {
+    "status": "not-run",
+    "steps": [
+      "Activate one Datadog registration in the selected client.",
+      "Complete client-managed OAuth with explicit user browser approval.",
+      "Confirm MCP initialize and tools/list in the client.",
+      "Discover a suitable read-only host tool and its argument schema.",
+      "Run one user-approved read-only query for HP11D, if that host belongs to the authorized account.",
+      "Restart the client and verify session reuse or normal reauthentication."
+    ]
+  },
+  "unverified": [
+    "Authenticated connectivity and OAuth registration behavior in each actual client",
+    "Actual Datadog tool availability, host presence, resource permissions and network policy",
+    "Token/session behavior after client restart",
+    "Cursor portable plugin installation through the user's distribution channel",
+    "PowerShell script execution on Windows or PowerShell 7",
+    "Protected-resource metadata availability; public web fetch exposed no HTTP status",
+    "Datadog diagnostic registration issuing a client secret for Microsoft DCR",
+    "Cowork publisher metadata, schema validation, tenant upload, OAuth and Information Barriers",
+    "Compatibility with, or merge into, the intended destination repository"
+  ]
+}

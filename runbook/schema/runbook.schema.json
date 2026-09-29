@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/dayour/datadog-agent-plugin/runbook/schema/runbook.schema.json",
+  "title": "Datadog observability runbook manifest",
+  "description": "Top-level manifest. Declares parameters (each bound to an environment variable in .env), naming/tag conventions, guardrails, and the ordered list of composable modules. Environment-specific values never live in this file.",
+  "type": "object",
+  "required": ["schemaVersion", "id", "title", "parameters", "conventions", "guardrails", "modules"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "schemaVersion": { "const": "1.1" },
+    "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+    "title": { "type": "string" },
+    "description": { "type": "string" },
+    "parameters": {
+      "type": "object",
+      "description": "Named parameters referenced as ${name} in module files. Each is read from its env variable (.env, then the process environment), falling back to default.",
+      "propertyNames": { "pattern": "^[a-z][a-z0-9_]*$" },
+      "additionalProperties": { "$ref": "#/$defs/parameter" }
+    },
+    "idReferences": {
+      "type": "object",
+      "description": "How ${id.<resource-id>} placeholders resolve to Datadog object IDs.",
+      "required": ["envPrefix", "unresolved"],
+      "properties": {
+        "envPrefix": { "const": "DD_ID_" },
+        "rule": { "type": "string" },
+        "unresolved": { "type": "string", "description": "Text substituted when an id is not known yet (resource not applied)." }
+      }
+    },
+    "conventions": {
+      "type": "object",
+      "required": ["namePrefix", "tags"],
+      "properties": {
+        "namePrefix": { "type": "string" },
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "notes": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "guardrails": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+    "outOfScope": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["item", "reason"],
+        "properties": { "item": { "type": "string" }, "reason": { "type": "string" } }
+      }
+    },
+    "modules": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "path", "enabled"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+          "path": { "type": "string", "description": "Relative path to the module.json" },
+          "enabled": { "type": "boolean" },
+          "order": { "type": "integer" },
+          "dependsOn": { "type": "array", "items": { "type": "string" } },
+          "summary": { "type": "string" }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "parameter": {
+      "type": "object",
+      "required": ["description", "type", "env"],
+      "additionalProperties": false,
+      "properties": {
+        "description": { "type": "string" },
+        "type": { "enum": ["string", "number", "boolean", "list"] },
+        "env": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*$", "description": "Environment variable (in .env) that supplies the value." },
+        "default": { "description": "Generic default. Never an environment-specific identifier." },
+        "required": { "type": "boolean", "default": false, "description": "Render fails when a required parameter has no value." },
+        "secret": { "type": "boolean", "default": false, "description": "Secrets are only read by tools that call APIs; they are never rendered into files or printed." },
+        "group": { "enum": ["datadog", "datadog-ids", "azure", "m365", "github", "powerplatform", "hosts", "notifications"] },
+        "discover": { "type": "string", "description": "How tools/fill-env.mjs (or a person/Copilot) finds the value, e.g. a CLI command." },
+        "example": { "type": "string" }
+      }
+    }
+  }
+}

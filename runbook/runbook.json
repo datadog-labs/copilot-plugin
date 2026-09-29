@@ -1,0 +1,80 @@
+{
+  "$schema": "./schema/runbook.schema.json",
+  "schemaVersion": "1.1",
+  "id": "datadog-microsoft-github-observability",
+  "title": "Datadog observability runbook: GitHub, Microsoft 365, Entra ID and Copilot",
+  "description": "Composable, schema-driven runbook that configures a Datadog organization end to end for GitHub (code, CI, security), GitHub Copilot, Active Directory, Microsoft Entra ID, Microsoft Graph security, Microsoft Teams and Microsoft 365 audit, Microsoft 365 Copilot, Copilot Studio agents, Dataverse, and Windows Agent hosts. Every module is independently replayable. All environment-specific values come from .env (see .env.example); run tools/fill-env.mjs to discover them.",
+  "parameters": {
+    "dd_site": { "group": "datadog", "description": "Datadog site domain.", "type": "string", "env": "DD_SITE", "default": "datadoghq.com", "example": "datadoghq.eu" },
+    "dd_app_url": { "group": "datadog", "description": "Datadog web app base URL for links in monitor messages and notes.", "type": "string", "env": "DD_APP_URL", "default": "https://app.datadoghq.com" },
+    "dd_api_key": { "group": "datadog", "description": "Datadog API key (apply/export/fill-env and bridges only).", "type": "string", "env": "DD_API_KEY", "secret": true, "discover": "Organization Settings > API Keys (create or copy; never commit)." },
+    "dd_app_key": { "group": "datadog", "description": "Datadog application key with dashboards_write, monitors_write and integrations_read scopes (apply/export/fill-env only).", "type": "string", "env": "DD_APP_KEY", "secret": true, "discover": "Organization Settings > Application Keys." },
+    "dd_org_name": { "group": "datadog", "description": "Datadog organization display name.", "type": "string", "env": "DD_ORG_NAME", "required": true, "discover": "GET /api/v1/org (name) or Organization Settings.", "example": "Contoso" },
+    "name_prefix": { "group": "datadog", "description": "Prefix for every dashboard and monitor title (keep the trailing ' | ').", "type": "string", "env": "DD_NAME_PREFIX", "default": "Contoso | " },
+    "project_tag": { "group": "datadog", "description": "Project tag applied to every monitor.", "type": "string", "env": "DD_PROJECT_TAG", "default": "project:contoso" },
+    "notify": { "group": "notifications", "description": "Notification handle(s) appended to monitor messages, e.g. '@teams-Datadog_Alerts' or '@ops@contoso.com'. Leave the default sentence until a destination is chosen.", "type": "string", "env": "DD_RUNBOOK_NOTIFY", "default": "No notification recipients configured; Teams destination selection is pending." },
+    "teams_handle": { "group": "notifications", "description": "Datadog Microsoft Teams tenant-based handle name (without @teams-).", "type": "string", "env": "DD_TEAMS_HANDLE", "discover": "Integrations > Microsoft Teams > Tenant-based > handles." },
+    "agent_host": { "group": "hosts", "description": "Primary Windows host running the Datadog Agent.", "type": "string", "env": "DD_AGENT_HOST", "required": true, "discover": "GET /api/v1/hosts (host_list[].name).", "example": "WS-OPS-01" },
+    "dc_host_filter": { "group": "hosts", "description": "Datadog tag filter selecting Active Directory domain controllers.", "type": "string", "env": "DD_DC_HOST_FILTER", "default": "role:domain-controller" },
+    "azure_tenant_id": { "group": "azure", "description": "Microsoft Entra tenant ID (also the Microsoft 365 tenant_id on audit logs).", "type": "string", "env": "AZURE_TENANT_ID", "required": true, "discover": "az account show --query tenantId -o tsv" },
+    "azure_subscription_id": { "group": "azure", "description": "The only Azure subscription the runbook may touch.", "type": "string", "env": "AZURE_SUBSCRIPTION_ID", "required": true, "discover": "az account show --query id -o tsv" },
+    "azure_resource_group": { "group": "azure", "description": "Resource group for runbook-created Azure resources (Event Hub, forwarder).", "type": "string", "env": "AZURE_RESOURCE_GROUP", "default": "rg-datadog-observability" },
+    "azure_location": { "group": "azure", "description": "Azure region for runbook-created resources.", "type": "string", "env": "AZURE_LOCATION", "default": "eastus2" },
+    "eventhub_namespace": { "group": "azure", "description": "Event Hubs namespace that streams Entra ID and App Insights diagnostics to Datadog.", "type": "string", "env": "AZURE_EVENTHUB_NAMESPACE", "default": "evhns-datadog-logs" },
+    "eventhub_name": { "group": "azure", "description": "Event hub name inside the namespace.", "type": "string", "env": "AZURE_EVENTHUB_NAME", "default": "datadog-logs" },
+    "appinsights_name": { "group": "azure", "description": "Application Insights resource receiving Copilot Studio agent telemetry.", "type": "string", "env": "APPINSIGHTS_NAME", "discover": "az resource list --resource-type microsoft.insights/components --subscription $AZURE_SUBSCRIPTION_ID" },
+    "appinsights_app_id": { "group": "azure", "description": "Application Insights application ID.", "type": "string", "env": "APPINSIGHTS_APP_ID", "discover": "az resource show ... --query properties.AppId" },
+    "log_analytics_workspace_id": { "group": "azure", "description": "Log Analytics workspace customerId backing the Application Insights resource.", "type": "string", "env": "LOG_ANALYTICS_WORKSPACE_ID", "discover": "az monitor log-analytics workspace show ... --query customerId" },
+    "m365_audit_service_entra": { "group": "m365", "description": "service value of Entra (Azure AD) records in the Microsoft 365 audit feed.", "type": "string", "env": "M365_AUDIT_SERVICE_ENTRA", "default": "AzureActiveDirectory" },
+    "m365_audit_service_teams": { "group": "m365", "description": "service value of Teams records in the Microsoft 365 audit feed.", "type": "string", "env": "M365_AUDIT_SERVICE_TEAMS", "default": "MicrosoftTeams" },
+    "github_orgs": { "group": "github", "description": "Comma-separated GitHub organizations in scope (with the Datadog GitHub App installed).", "type": "list", "env": "GITHUB_ORGS", "required": true, "discover": "gh api user/orgs --jq '.[].login'", "example": "contoso,contoso-labs" },
+    "github_user_accounts": { "group": "github", "description": "Comma-separated personal GitHub accounts with the Datadog GitHub App installed.", "type": "list", "env": "GITHUB_USER_ACCOUNTS", "default": "" },
+    "github_enterprise_slug": { "group": "github", "description": "GitHub Enterprise Cloud slug (for audit-log streaming).", "type": "string", "env": "GITHUB_ENTERPRISE_SLUG", "discover": "gh api orgs/<org>/audit-log --jq '.[0].business'" },
+    "github_copilot_orgs": { "group": "github", "description": "Comma-separated lowercase org_name tag values reported by the GitHub Copilot integration.", "type": "list", "env": "GITHUB_COPILOT_ORGS", "discover": "GET /api/v2/metrics/github_copilot.organizations.billing.seats.total/all-tags" },
+    "pp_environment_ids": { "group": "powerplatform", "description": "Comma-separated Power Platform environment IDs monitored by the Copilot Studio and Dataverse bridges.", "type": "list", "env": "PP_ENVIRONMENT_IDS", "discover": "pac env list" },
+    "pp_environment_urls": { "group": "powerplatform", "description": "Comma-separated Dataverse environment URLs (same order as PP_ENVIRONMENT_IDS).", "type": "list", "env": "PP_ENVIRONMENT_URLS", "discover": "pac env list" }
+  },
+  "idReferences": {
+    "envPrefix": "DD_ID_",
+    "rule": "${id.<resource-id>} resolves to env DD_ID_<RESOURCE_ID uppercased, '-' -> '_'>. tools/apply.mjs writes these after create/update; tools/export.mjs and tools/fill-env.mjs discover them by exact title.",
+    "unresolved": "(not applied yet)"
+  },
+  "conventions": {
+    "namePrefix": "${name_prefix}",
+    "tags": ["${project_tag}", "managed-by:runbook"],
+    "notes": [
+      "Monitor tags: ${project_tag}, integration:<datadog_integration_slug>, purpose:<telemetry-health|change-review|security-review|delivery-health|license-review|capacity>, managed-by:runbook, module:<module-id>.",
+      "Dashboards carry no tags (v1 API only accepts team: tags); the module id is in the description.",
+      "Title is the idempotency key: apply updates the object with the same rendered title instead of creating a duplicate.",
+      "Resource ids are unique across all modules; they name the DD_ID_* env keys.",
+      "Monitor messages end with ${notify}. Monitors default to notify_no_data false; only explicit freshness monitors set it true."
+    ]
+  },
+  "guardrails": [
+    "Azure: only AZURE_SUBSCRIPTION_ID in AZURE_TENANT_ID. Always pass --subscription explicitly; operator logins often see unrelated tenants and subscriptions.",
+    "Secrets (client secrets, API/app keys, tokens, webhook URLs that embed keys) are never written to the runbook, .env.example, logs or chat. A human enters them in the vendor UI or exports them in .env, which is git-ignored.",
+    "Steps with cost impact (Azure resources, Copilot seats, Datadog log retention) or outward effects (GitHub webhooks, repository settings, OAuth consent, app installs) require explicit human approval at the step.",
+    "Security findings are recorded as counts and alert categories only, never as secret values or the locations of exposed credentials.",
+    "Every custom resource is tagged managed-by:runbook so it can be listed and removed in bulk."
+  ],
+  "outOfScope": [
+    { "item": "Hugging Face TGI, Nvidia DCGM / NVML / Triton, Ray", "reason": "No GPU or model-serving hosts in the target estate." },
+    { "item": "Microsoft Fabric", "reason": "Not part of the target estate." },
+    { "item": "Unifi Console", "reason": "Not part of the target estate." }
+  ],
+  "modules": [
+    { "id": "foundation", "path": "modules/00-foundation/module.json", "enabled": true, "order": 0, "summary": "Org conventions, keys, notification routing, tag policy, log index, trial checklist." },
+    { "id": "github", "path": "modules/10-github/module.json", "enabled": true, "order": 10, "dependsOn": ["foundation"], "summary": "GitHub App telemetry, CI Visibility for GitHub Actions, PR activity, code and secret scanning." },
+    { "id": "github-copilot", "path": "modules/11-github-copilot/module.json", "enabled": true, "order": 11, "dependsOn": ["foundation"], "summary": "GitHub Copilot seats, engagement, code impact and pull-request metrics." },
+    { "id": "active-directory", "path": "modules/20-active-directory/module.json", "enabled": true, "order": 20, "dependsOn": ["foundation", "windows-agent-host"], "summary": "Active Directory Domain Services on domain controllers via the Datadog Agent." },
+    { "id": "entra-id", "path": "modules/21-entra-id/module.json", "enabled": true, "order": 21, "dependsOn": ["foundation", "microsoft-365-audit"], "summary": "Entra ID audit via the M365 feed plus direct sign-in/audit logs via Azure Event Hub." },
+    { "id": "microsoft-graph", "path": "modules/22-microsoft-graph/module.json", "enabled": true, "order": 22, "dependsOn": ["foundation"], "summary": "Microsoft Graph security alerts (Defender, Purview, Entra ID Protection, Sentinel)." },
+    { "id": "microsoft-teams", "path": "modules/23-microsoft-teams/module.json", "enabled": true, "order": 23, "dependsOn": ["foundation", "microsoft-365-audit"], "summary": "Teams audit activity, Teams Copilot adoption, and Teams as the alert destination." },
+    { "id": "microsoft-365-audit", "path": "modules/24-microsoft-365-audit/module.json", "enabled": true, "order": 24, "dependsOn": ["foundation"], "summary": "Shared Microsoft 365 unified audit feed health and workload overview." },
+    { "id": "microsoft-copilot", "path": "modules/30-microsoft-copilot/module.json", "enabled": true, "order": 30, "dependsOn": ["foundation"], "summary": "Microsoft 365 Copilot enabled vs active users per app, adoption and license utilization." },
+    { "id": "copilot-studio", "path": "modules/31-copilot-studio/module.json", "enabled": true, "order": 31, "dependsOn": ["foundation"], "summary": "Copilot Studio agents: App Insights telemetry bridged to copilot_studio.* metrics, invocations, tools, errors, latency." },
+    { "id": "dataverse", "path": "modules/32-dataverse/module.json", "enabled": true, "order": 32, "dependsOn": ["foundation"], "summary": "Dataverse API and plug-in health bridged to dataverse.* metrics." },
+    { "id": "windows-agent-host", "path": "modules/40-windows-agent-host/module.json", "enabled": true, "order": 40, "dependsOn": ["foundation"], "summary": "Windows hosts running the Datadog Agent: heartbeat, CPU, memory, disk, network, services." },
+    { "id": "executive-overview", "path": "modules/90-executive-overview/module.json", "enabled": true, "order": 90, "dependsOn": ["github", "github-copilot", "entra-id", "microsoft-graph", "microsoft-copilot", "copilot-studio"], "summary": "Single executive overview dashboard and SLO summary linking every module." }
+  ]
+}

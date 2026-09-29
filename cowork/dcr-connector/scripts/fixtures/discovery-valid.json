@@ -1,0 +1,28 @@
+{
+  "fixture": "Synthetic offline metadata for parser tests; not a live Datadog result.",
+  "responses": {
+    "GET https://mcp.datadoghq.com/v1/mcp": {
+      "status": 401,
+      "wwwAuthenticate": "Bearer resource_metadata=\"https://mcp.datadoghq.com/.well-known/oauth-protected-resource/v1/mcp\""
+    },
+    "GET https://mcp.datadoghq.com/.well-known/oauth-protected-resource/v1/mcp": {
+      "status": 200,
+      "body": {
+        "resource": "https://mcp.datadoghq.com/v1/mcp",
+        "authorization_servers": ["https://mcp.datadoghq.com"]
+      }
+    },
+    "GET https://mcp.datadoghq.com/.well-known/oauth-authorization-server": {
+      "status": 200,
+      "body": {
+        "issuer": "https://mcp.datadoghq.com",
+        "authorization_endpoint": "https://mcp.datadoghq.com/api/unstable/mcp-server/authorize",
+        "token_endpoint": "https://mcp.datadoghq.com/api/unstable/mcp-server/token",
+        "registration_endpoint": "https://mcp.datadoghq.com/api/unstable/mcp-server/register",
+        "grant_types_supported": ["authorization_code", "refresh_token"],
+        "code_challenge_methods_supported": ["S256"],
+        "token_endpoint_auth_methods_supported": ["client_secret_basic", "client_secret_post", "none"]
+      }
+    }
+  }
+}
