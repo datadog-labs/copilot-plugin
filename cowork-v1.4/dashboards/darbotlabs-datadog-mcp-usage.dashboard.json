@@ -1,0 +1,183 @@
+{
+  "title": "Darbotlabs - Datadog MCP Server Usage (Cowork plugin evidence)",
+  "description": "Datadog emits datadog.mcp.session.starts and datadog.mcp.tool.usage for every MCP session and tool call, tagged with client, tool_name, user_email. When the Copilot Cowork plugin connects, its calls appear here - this is the real proof of connection.",
+  "layout_type": "ordered",
+  "widgets": [
+    {
+      "definition": {
+        "title": "Sessions and calls",
+        "type": "group",
+        "layout_type": "ordered",
+        "background_color": "vivid_blue",
+        "widgets": [
+          {
+            "definition": {
+              "title": "MCP sessions started",
+              "type": "query_value",
+              "requests": [
+                {
+                  "q": "sum:datadog.mcp.session.starts{*}.as_count()",
+                  "aggregator": "last"
+                }
+              ],
+              "autoscale": true,
+              "precision": 0
+            }
+          },
+          {
+            "definition": {
+              "title": "Tool calls",
+              "type": "query_value",
+              "requests": [
+                {
+                  "q": "count:datadog.mcp.tool.usage{*}.as_count()",
+                  "aggregator": "last"
+                }
+              ],
+              "autoscale": true,
+              "precision": 0
+            }
+          },
+          {
+            "definition": {
+              "title": "Tool calls from Copilot Cowork",
+              "type": "query_value",
+              "requests": [
+                {
+                  "q": "count:datadog.mcp.tool.usage{client:copilot-cowork}.as_count()",
+                  "aggregator": "last"
+                }
+              ],
+              "autoscale": true,
+              "precision": 0
+            }
+          },
+          {
+            "definition": {
+              "title": "Sessions by client",
+              "type": "timeseries",
+              "requests": [
+                {
+                  "q": "sum:datadog.mcp.session.starts{*} by {client}.as_count()",
+                  "display_type": "bars",
+                  "style": {
+                    "palette": "dog_classic",
+                    "line_type": "solid",
+                    "line_width": "normal"
+                  }
+                }
+              ],
+              "show_legend": true,
+              "legend_layout": "auto"
+            }
+          },
+          {
+            "definition": {
+              "title": "Tool calls by client",
+              "type": "timeseries",
+              "requests": [
+                {
+                  "q": "count:datadog.mcp.tool.usage{*} by {client}.as_count()",
+                  "display_type": "bars",
+                  "style": {
+                    "palette": "dog_classic",
+                    "line_type": "solid",
+                    "line_width": "normal"
+                  }
+                }
+              ],
+              "show_legend": true,
+              "legend_layout": "auto"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "definition": {
+        "title": "What is being called",
+        "type": "group",
+        "layout_type": "ordered",
+        "background_color": "vivid_purple",
+        "widgets": [
+          {
+            "definition": {
+              "title": "Top tools",
+              "type": "toplist",
+              "requests": [
+                {
+                  "q": "top(count:datadog.mcp.tool.usage{*} by {tool_name}.as_count(), 15, 'sum', 'desc')"
+                }
+              ]
+            }
+          },
+          {
+            "definition": {
+              "title": "Top users",
+              "type": "toplist",
+              "requests": [
+                {
+                  "q": "top(count:datadog.mcp.tool.usage{*} by {user_email}.as_count(), 10, 'sum', 'desc')"
+                }
+              ]
+            }
+          },
+          {
+            "definition": {
+              "title": "Copilot Cowork tool calls by tool",
+              "type": "timeseries",
+              "requests": [
+                {
+                  "q": "count:datadog.mcp.tool.usage{client:copilot-cowork} by {tool_name}.as_count()",
+                  "display_type": "bars",
+                  "style": {
+                    "palette": "dog_classic",
+                    "line_type": "solid",
+                    "line_width": "normal"
+                  }
+                }
+              ],
+              "show_legend": true,
+              "legend_layout": "auto"
+            }
+          },
+          {
+            "definition": {
+              "title": "Audit Trail: MCP tool calls",
+              "type": "log_stream",
+              "query": "source:audit @action:*mcp* OR @evt.name:*mcp*",
+              "columns": [
+                "@usr.email",
+                "@action"
+              ],
+              "show_date_column": true,
+              "show_message_column": true,
+              "message_display": "inline",
+              "sort": {
+                "column": "time",
+                "order": "desc"
+              }
+            }
+          },
+          {
+            "definition": {
+              "type": "note",
+              "content": "Client tag values follow the MCP client name presented at initialize; Cowork presents `copilot-cowork`. If the filter shows nothing, check the Top clients panel for the exact tag value.",
+              "background_color": "gray",
+              "font_size": "14",
+              "text_align": "left",
+              "show_tick": false
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "template_variables": [],
+  "notify_list": [],
+  "reflow_type": "auto",
+  "tags": [
+    "team:darbotlabs",
+    "managed-by:cowork-plugin"
+  ]
+}

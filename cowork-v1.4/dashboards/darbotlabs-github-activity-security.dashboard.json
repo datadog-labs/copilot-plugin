@@ -1,0 +1,167 @@
+{
+  "title": "Darbotlabs - GitHub Activity & Security",
+  "description": "Repository events from the GitHub webhook integration (source:github), plus audit-log streaming and code/secret scanning telemetry where enabled.",
+  "layout_type": "ordered",
+  "widgets": [
+    {
+      "definition": {
+        "title": "Repository activity (events)",
+        "type": "group",
+        "layout_type": "ordered",
+        "background_color": "vivid_blue",
+        "widgets": [
+          {
+            "definition": {
+              "title": "Events per hour",
+              "type": "event_timeseries",
+              "query": "source:github $repo",
+              "tags_execution": "and"
+            }
+          },
+          {
+            "definition": {
+              "title": "Pull requests",
+              "type": "event_stream",
+              "query": "source:github $repo pull_request",
+              "event_size": "s",
+              "tags_execution": "and"
+            }
+          },
+          {
+            "definition": {
+              "title": "Pushes and releases",
+              "type": "event_stream",
+              "query": "source:github $repo (push OR release)",
+              "event_size": "s",
+              "tags_execution": "and"
+            }
+          },
+          {
+            "definition": {
+              "title": "Issues and comments",
+              "type": "event_stream",
+              "query": "source:github $repo (issues OR issue_comment)",
+              "event_size": "s",
+              "tags_execution": "and"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "definition": {
+        "title": "Security",
+        "type": "group",
+        "layout_type": "ordered",
+        "background_color": "vivid_pink",
+        "widgets": [
+          {
+            "definition": {
+              "title": "Dependabot & vulnerability alerts",
+              "type": "event_stream",
+              "query": "source:github $repo (dependabot OR vulnerability)",
+              "event_size": "s",
+              "tags_execution": "and"
+            }
+          },
+          {
+            "definition": {
+              "title": "Security advisories",
+              "type": "event_stream",
+              "query": "source:github $repo security_advisory",
+              "event_size": "s",
+              "tags_execution": "and"
+            }
+          },
+          {
+            "definition": {
+              "title": "GitHub audit log stream (enterprise)",
+              "type": "log_stream",
+              "query": "source:github",
+              "columns": [
+                "service",
+                "status"
+              ],
+              "show_date_column": true,
+              "show_message_column": true,
+              "message_display": "inline",
+              "sort": {
+                "column": "time",
+                "order": "desc"
+              }
+            }
+          },
+          {
+            "definition": {
+              "type": "note",
+              "content": "Code Scan and Secret Scan alert metrics appear once the Telemetry tab toggles are on for the org. Confirm exact metric names in Metrics Explorer (filter `github.`) and pin them here.",
+              "background_color": "gray",
+              "font_size": "14",
+              "text_align": "left",
+              "show_tick": false
+            }
+          }
+        ]
+      }
+    },
+    {
+      "definition": {
+        "title": "Change correlation",
+        "type": "group",
+        "layout_type": "ordered",
+        "background_color": "vivid_yellow",
+        "widgets": [
+          {
+            "definition": {
+              "title": "HP11D CPU with GitHub pushes overlaid",
+              "type": "timeseries",
+              "requests": [
+                {
+                  "q": "avg:system.cpu.user{host:hp11d}+avg:system.cpu.system{host:hp11d}",
+                  "display_type": "line",
+                  "style": {
+                    "palette": "dog_classic",
+                    "line_type": "solid",
+                    "line_width": "normal"
+                  }
+                }
+              ],
+              "show_legend": true,
+              "legend_layout": "auto",
+              "events": [
+                {
+                  "q": "source:github",
+                  "tags_execution": "and"
+                }
+              ]
+            }
+          },
+          {
+            "definition": {
+              "type": "note",
+              "content": "Enable event overlays in this dashboard's settings with `sources:github` to see pushes/releases on the CPU graph.",
+              "background_color": "gray",
+              "font_size": "14",
+              "text_align": "left",
+              "show_tick": false
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "template_variables": [
+    {
+      "name": "repo",
+      "prefix": "repository",
+      "available_values": [],
+      "default": "*"
+    }
+  ],
+  "notify_list": [],
+  "reflow_type": "auto",
+  "tags": [
+    "team:darbotlabs",
+    "managed-by:cowork-plugin"
+  ]
+}

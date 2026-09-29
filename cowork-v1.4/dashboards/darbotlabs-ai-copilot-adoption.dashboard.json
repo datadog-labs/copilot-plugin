@@ -1,0 +1,640 @@
+{
+  "title": "Darbotlabs - AI Copilot Adoption (GitHub Copilot + Microsoft 365 Copilot)",
+  "description": "Real adoption data from the GitHub Copilot and Microsoft Copilot integrations. GitHub Copilot metrics arrive daily from GitHub's Copilot Usage API; Microsoft Copilot usage reports are delayed up to 72 hours by Microsoft.",
+  "layout_type": "ordered",
+  "widgets": [
+    {
+      "definition": {
+        "title": "GitHub Copilot - engagement",
+        "type": "group",
+        "layout_type": "ordered",
+        "background_color": "vivid_blue",
+        "widgets": [
+          {
+            "definition": {
+              "title": "Daily active users",
+              "type": "query_value",
+              "requests": [
+                {
+                  "q": "sum:github_copilot.usage.organizations.daily_active_users{$org}",
+                  "aggregator": "last"
+                }
+              ],
+              "autoscale": true,
+              "precision": 0
+            }
+          },
+          {
+            "definition": {
+              "title": "Weekly active users",
+              "type": "query_value",
+              "requests": [
+                {
+                  "q": "sum:github_copilot.usage.organizations.weekly_active_users{$org}",
+                  "aggregator": "last"
+                }
+              ],
+              "autoscale": true,
+              "precision": 0
+            }
+          },
+          {
+            "definition": {
+              "title": "Monthly active users (28d)",
+              "type": "query_value",
+              "requests": [
+                {
+                  "q": "sum:github_copilot.usage.organizations.monthly_active_users{$org}",
+                  "aggregator": "last"
+                }
+              ],
+              "autoscale": true,
+              "precision": 0
+            }
+          },
+          {
+            "definition": {
+              "title": "Monthly active agent-mode users",
+              "type": "query_value",
+              "requests": [
+                {
+                  "q": "sum:github_copilot.usage.organizations.monthly_active_agent_users{$org}",
+                  "aggregator": "last"
+                }
+              ],
+              "autoscale": true,
+              "precision": 0
+            }
+          },
+          {
+            "definition": {
+              "title": "Active users trend",
+              "type": "timeseries",
+              "requests": [
+                {
+                  "q": "sum:github_copilot.usage.organizations.daily_active_users{$org}",
+                  "display_type": "line",
+                  "style": {
+                    "palette": "dog_classic",
+                    "line_type": "solid",
+                    "line_width": "normal"
+                  }
+                },
+                {
+                  "q": "sum:github_copilot.usage.organizations.weekly_active_users{$org}",
+                  "display_type": "line",
+                  "style": {
+                    "palette": "dog_classic",
+                    "line_type": "solid",
+                    "line_width": "normal"
+                  }
+                },
+                {
+                  "q": "sum:github_copilot.usage.organizations.monthly_active_users{$org}",
+                  "display_type": "line",
+                  "style": {
+                    "palette": "dog_classic",
+                    "line_type": "solid",
+                    "line_width": "normal"
+                  }
+                }
+              ],
+              "show_legend": true,
+              "legend_layout": "auto"
+            }
+          },
+          {
+            "definition": {
+              "title": "Prompts vs generations vs acceptances (daily)",
+              "type": "timeseries",
+              "requests": [
+                {
+                  "q": "sum:github_copilot.usage.organizations.user_initiated_interaction_count{$org}.as_count()",
+                  "display_type": "bars",
+                  "style": {
+                    "palette": "dog_classic",
+                    "line_type": "solid",
+                    "line_width": "normal"
+                  }
+                },
+                {
+                  "q": "sum:github_copilot.usage.organizations.code_generation_activity_count{$org}.as_count()",
+                  "display_type": "bars",
+                  "style": {
+                    "palette": "dog_classic",
+                    "line_type": "solid",
+                    "line_width": "normal"
+                  }
+                },
+                {
+                  "q": "sum:github_copilot.usage.organizations.code_acceptance_activity_count{$org}.as_count()",
+                  "display_type": "bars",
+                  "style": {
+                    "palette": "dog_classic",
+                    "line_type": "solid",
+                    "line_width": "normal"
+                  }
+                }
+              ],
+              "show_legend": true,
+              "legend_layout": "auto"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "definition": {
+        "title": "GitHub Copilot - code impact",
+        "type": "group",
+        "layout_type": "ordered",
+        "background_color": "vivid_purple",
+        "widgets": [
+          {
+            "definition": {
+              "title": "Lines suggested vs added",
+              "type": "timeseries",
+              "requests": [
+                {
+                  "q": "sum:github_copilot.usage.organizations.loc_suggested_to_add_sum{$org}.as_count()",
+                  "display_type": "bars",
+                  "style": {
+                    "palette": "dog_classic",
+                    "line_type": "solid",
+                    "line_width": "normal"
+                  }
+                },
+                {
+                  "q": "sum:github_copilot.usage.organizations.loc_added_sum{$org}.as_count()",
+                  "display_type": "bars",
+                  "style": {
+                    "palette": "dog_classic",
+                    "line_type": "solid",
+                    "line_width": "normal"
+                  }
+                }
+              ],
+              "show_legend": true,
+              "legend_layout": "auto"
+            }
+          },
+          {
+            "definition": {
+              "title": "Acceptances by IDE",
+              "type": "toplist",
+              "requests": [
+                {
+                  "q": "top(sum:github_copilot.usage.organizations.by_ide.code_acceptance_activity_count{$org} by {ide}.as_count(), 10, 'sum', 'desc')"
+                }
+              ]
+            }
+          },
+          {
+            "definition": {
+              "title": "Acceptances by feature",
+              "type": "toplist",
+              "requests": [
+                {
+                  "q": "top(sum:github_copilot.usage.organizations.by_feature.code_acceptance_activity_count{$org} by {feature}.as_count(), 10, 'sum', 'desc')"
+                }
+              ]
+            }
+          },
+          {
+            "definition": {
+              "title": "Lines added by language",
+              "type": "toplist",
+              "requests": [
+                {
+                  "q": "top(sum:github_copilot.usage.organizations.by_language_feature.loc_added_sum{$org} by {language}.as_count(), 10, 'sum', 'desc')"
+                }
+              ]
+            }
+          },
+          {
+            "definition": {
+              "title": "Prompts by model",
+              "type": "toplist",
+              "requests": [
+                {
+                  "q": "top(sum:github_copilot.usage.organizations.by_model_feature.user_initiated_interaction_count{$org} by {model}.as_count(), 10, 'sum', 'desc')"
+                }
+              ]
+            }
+          },
+          {
+            "definition": {
+              "title": "Pull requests: created / by Copilot / merged",
+              "type": "timeseries",
+              "requests": [
+                {
+                  "q": "sum:github_copilot.usage.organizations.pull_requests.total_created{$org}.as_count()",
+                  "display_type": "bars",
+                  "style": {
+                    "palette": "dog_classic",
+                    "line_type": "solid",
+                    "line_width": "normal"
+                  }
+                },
+                {
+                  "q": "sum:github_copilot.usage.organizations.pull_requests.total_created_by_copilot{$org}.as_count()",
+                  "display_type": "bars",
+                  "style": {
+                    "palette": "dog_classic",
+                    "line_type": "solid",
+                    "line_width": "normal"
+                  }
+                },
+                {
+                  "q": "sum:github_copilot.usage.organizations.pull_requests.total_merged{$org}.as_count()",
+                  "display_type": "bars",
+                  "style": {
+                    "palette": "dog_classic",
+                    "line_type": "solid",
+                    "line_width": "normal"
+                  }
+                }
+              ],
+              "show_legend": true,
+              "legend_layout": "auto"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "definition": {
+        "title": "GitHub Copilot - seats, CLI and credits",
+        "type": "group",
+        "layout_type": "ordered",
+        "background_color": "vivid_orange",
+        "widgets": [
+          {
+            "definition": {
+              "title": "Seats billed",
+              "type": "query_value",
+              "requests": [
+                {
+                  "q": "sum:github_copilot.organizations.billing.seats.total{$org}",
+                  "aggregator": "last"
+                }
+              ],
+              "autoscale": true,
+              "precision": 0
+            }
+          },
+          {
+            "definition": {
+              "title": "Seats active this cycle",
+              "type": "query_value",
+              "requests": [
+                {
+                  "q": "sum:github_copilot.organizations.billing.seats.active_this_cycle{$org}",
+                  "aggregator": "last"
+                }
+              ],
+              "autoscale": true,
+              "precision": 0
+            }
+          },
+          {
+            "definition": {
+              "title": "Seats inactive this cycle",
+              "type": "query_value",
+              "requests": [
+                {
+                  "q": "sum:github_copilot.organizations.billing.seats.inactive_this_cycle{$org}",
+                  "aggregator": "last"
+                }
+              ],
+              "autoscale": true,
+              "precision": 0
+            }
+          },
+          {
+            "definition": {
+              "title": "Seats pending invitation",
+              "type": "query_value",
+              "requests": [
+                {
+                  "q": "sum:github_copilot.organizations.billing.seats.pending_invitation{$org}",
+                  "aggregator": "last"
+                }
+              ],
+              "autoscale": true,
+              "precision": 0
+            }
+          },
+          {
+            "definition": {
+              "title": "CLI sessions / requests / prompts",
+              "type": "timeseries",
+              "requests": [
+                {
+                  "q": "sum:github_copilot.usage.organizations.cli.session_count{$org}.as_count()",
+                  "display_type": "bars",
+                  "style": {
+                    "palette": "dog_classic",
+                    "line_type": "solid",
+                    "line_width": "normal"
+                  }
+                },
+                {
+                  "q": "sum:github_copilot.usage.organizations.cli.request_count{$org}.as_count()",
+                  "display_type": "bars",
+                  "style": {
+                    "palette": "dog_classic",
+                    "line_type": "solid",
+                    "line_width": "normal"
+                  }
+                },
+                {
+                  "q": "sum:github_copilot.usage.organizations.cli.prompt_count{$org}.as_count()",
+                  "display_type": "bars",
+                  "style": {
+                    "palette": "dog_classic",
+                    "line_type": "solid",
+                    "line_width": "normal"
+                  }
+                }
+              ],
+              "show_legend": true,
+              "legend_layout": "auto"
+            }
+          },
+          {
+            "definition": {
+              "title": "CLI tokens (prompt vs output)",
+              "type": "timeseries",
+              "requests": [
+                {
+                  "q": "sum:github_copilot.usage.organizations.cli.token_usage.prompt_tokens_sum{$org}.as_count()",
+                  "display_type": "area",
+                  "style": {
+                    "palette": "dog_classic",
+                    "line_type": "solid",
+                    "line_width": "normal"
+                  }
+                },
+                {
+                  "q": "sum:github_copilot.usage.organizations.cli.token_usage.output_tokens_sum{$org}.as_count()",
+                  "display_type": "area",
+                  "style": {
+                    "palette": "dog_classic",
+                    "line_type": "solid",
+                    "line_width": "normal"
+                  }
+                }
+              ],
+              "show_legend": true,
+              "legend_layout": "auto"
+            }
+          },
+          {
+            "definition": {
+              "title": "AI credits used by user (cents)",
+              "type": "toplist",
+              "requests": [
+                {
+                  "q": "top(sum:github_copilot.usage.organizations.users.ai_credits_used{$org} by {user}.as_count(), 15, 'sum', 'desc')"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "definition": {
+        "title": "Microsoft 365 Copilot",
+        "type": "group",
+        "layout_type": "ordered",
+        "background_color": "vivid_green",
+        "widgets": [
+          {
+            "definition": {
+              "title": "Enabled users (any app)",
+              "type": "query_value",
+              "requests": [
+                {
+                  "q": "max:microsoft_copilot.anyapp.users.enabled{*}",
+                  "aggregator": "last"
+                }
+              ],
+              "autoscale": true,
+              "precision": 0
+            }
+          },
+          {
+            "definition": {
+              "title": "Active users (any app)",
+              "type": "query_value",
+              "requests": [
+                {
+                  "q": "max:microsoft_copilot.anyapp.users.active{*}",
+                  "aggregator": "last"
+                }
+              ],
+              "autoscale": true,
+              "precision": 0
+            }
+          },
+          {
+            "definition": {
+              "title": "User prompts",
+              "type": "query_value",
+              "requests": [
+                {
+                  "q": "sum:microsoft_copilot.userprompt.count{*}.as_count()",
+                  "aggregator": "last"
+                }
+              ],
+              "autoscale": true,
+              "precision": 0
+            }
+          },
+          {
+            "definition": {
+              "title": "AI responses",
+              "type": "query_value",
+              "requests": [
+                {
+                  "q": "sum:microsoft_copilot.airesponse.count{*}.as_count()",
+                  "aggregator": "last"
+                }
+              ],
+              "autoscale": true,
+              "precision": 0
+            }
+          },
+          {
+            "definition": {
+              "title": "Guardrail responses",
+              "type": "query_value",
+              "requests": [
+                {
+                  "q": "sum:microsoft_copilot.airesponse.guardrail.count{*}.as_count()",
+                  "aggregator": "last"
+                }
+              ],
+              "autoscale": true,
+              "precision": 0
+            }
+          },
+          {
+            "definition": {
+              "title": "Active vs enabled (any app)",
+              "type": "timeseries",
+              "requests": [
+                {
+                  "q": "max:microsoft_copilot.anyapp.users.active{*}",
+                  "display_type": "line",
+                  "style": {
+                    "palette": "dog_classic",
+                    "line_type": "solid",
+                    "line_width": "normal"
+                  }
+                },
+                {
+                  "q": "max:microsoft_copilot.anyapp.users.enabled{*}",
+                  "display_type": "line",
+                  "style": {
+                    "palette": "dog_classic",
+                    "line_type": "solid",
+                    "line_width": "normal"
+                  }
+                }
+              ],
+              "show_legend": true,
+              "legend_layout": "auto"
+            }
+          },
+          {
+            "definition": {
+              "title": "Active users by app",
+              "type": "timeseries",
+              "requests": [
+                {
+                  "q": "max:microsoft_copilot.copilotchat.users.active{*}",
+                  "display_type": "bars",
+                  "style": {
+                    "palette": "dog_classic",
+                    "line_type": "solid",
+                    "line_width": "normal"
+                  }
+                },
+                {
+                  "q": "max:microsoft_copilot.teams.users.active{*}",
+                  "display_type": "bars",
+                  "style": {
+                    "palette": "dog_classic",
+                    "line_type": "solid",
+                    "line_width": "normal"
+                  }
+                },
+                {
+                  "q": "max:microsoft_copilot.outlook.users.active{*}",
+                  "display_type": "bars",
+                  "style": {
+                    "palette": "dog_classic",
+                    "line_type": "solid",
+                    "line_width": "normal"
+                  }
+                },
+                {
+                  "q": "max:microsoft_copilot.word.users.active{*}",
+                  "display_type": "bars",
+                  "style": {
+                    "palette": "dog_classic",
+                    "line_type": "solid",
+                    "line_width": "normal"
+                  }
+                },
+                {
+                  "q": "max:microsoft_copilot.excel.users.active{*}",
+                  "display_type": "bars",
+                  "style": {
+                    "palette": "dog_classic",
+                    "line_type": "solid",
+                    "line_width": "normal"
+                  }
+                },
+                {
+                  "q": "max:microsoft_copilot.powerpoint.users.active{*}",
+                  "display_type": "bars",
+                  "style": {
+                    "palette": "dog_classic",
+                    "line_type": "solid",
+                    "line_width": "normal"
+                  }
+                },
+                {
+                  "q": "max:microsoft_copilot.onenote.users.active{*}",
+                  "display_type": "bars",
+                  "style": {
+                    "palette": "dog_classic",
+                    "line_type": "solid",
+                    "line_width": "normal"
+                  }
+                },
+                {
+                  "q": "max:microsoft_copilot.loop.users.active{*}",
+                  "display_type": "bars",
+                  "style": {
+                    "palette": "dog_classic",
+                    "line_type": "solid",
+                    "line_width": "normal"
+                  }
+                }
+              ],
+              "show_legend": true,
+              "legend_layout": "auto"
+            }
+          },
+          {
+            "definition": {
+              "title": "Per-user last-activity log (daily)",
+              "type": "log_stream",
+              "query": "source:microsoft-copilot",
+              "columns": [
+                "service",
+                "status"
+              ],
+              "show_date_column": true,
+              "show_message_column": true,
+              "message_display": "inline",
+              "sort": {
+                "column": "time",
+                "order": "desc"
+              }
+            }
+          },
+          {
+            "definition": {
+              "type": "note",
+              "content": "Microsoft publishes Copilot usage reports with up to 72 h delay; blank panels for the current day are expected.",
+              "background_color": "gray",
+              "font_size": "14",
+              "text_align": "left",
+              "show_tick": false
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "template_variables": [
+    {
+      "name": "org",
+      "prefix": "org",
+      "available_values": [],
+      "default": "*"
+    }
+  ],
+  "notify_list": [],
+  "reflow_type": "auto",
+  "tags": [
+    "team:darbotlabs",
+    "managed-by:cowork-plugin"
+  ]
+}
