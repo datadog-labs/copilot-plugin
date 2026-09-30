@@ -1,0 +1,29 @@
+# yaml-language-server: $schema=https://aka.ms/m365-agents-toolkits/v1.13/yaml.schema.json
+# Alternative to register/dcr: a static OAuth configuration whose client is registered once on the
+# bridge (POST <bridge>/register, which issues a client secret). Microsoft's token store then signs in
+# through the bridge; the bridge runs Datadog's PKCE sign-in and sends code_verifier itself.
+#   atk provision --env dev          (DATADOG_BRIDGE_CLIENT_ID / _SECRET set in env/.env.dev.user)
+# Output: DATADOG_OAUTH_CONFIGURATION_ID -> build.py --auth oauth --reference-id <id>
+version: v1.13
+environmentFolderPath: ./env
+
+provision:
+  - uses: oauth/register
+    with:
+      name: Datadog for Copilot Cowork (bridge OAuth)
+      appId: ${{TEAMS_APP_ID}}
+      applicableToApps: AnyApp
+      targetAudience: HomeTenant
+      flow: authorizationCode
+      identityProvider: Custom
+      baseUrl: ${{DATADOG_BRIDGE_URL}}
+      authorizationUrl: ${{DATADOG_BRIDGE_URL}}/authorize
+      tokenUrl: ${{DATADOG_BRIDGE_URL}}/token
+      refreshUrl: ${{DATADOG_BRIDGE_URL}}/token
+      clientId: ${{DATADOG_BRIDGE_CLIENT_ID}}
+      clientSecret: ${{SECRET_DATADOG_BRIDGE_CLIENT_SECRET}}
+      scope: mcp_read
+      isPKCEEnabled: true
+      tokenExchangeMethodType: PostRequestBody
+    writeToEnvironmentFile:
+      configurationId: DATADOG_OAUTH_CONFIGURATION_ID

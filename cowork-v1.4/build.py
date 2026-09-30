@@ -18,7 +18,7 @@ import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
-VERSION = "1.4.5"
+VERSION = "1.5.0"
 SCHEMA = "https://developer.microsoft.com/json-schemas/teams/v1.28/MicrosoftTeams.schema.json"
 CATALOG = json.loads((ROOT / "catalog" / "core-tools.json").read_text())
 SITES = CATALOG["sites"]
@@ -111,6 +111,16 @@ def authorization(auth, reference_id):
     if not reference_id or not re.fullmatch(r"[A-Za-z0-9+/=_-]{8,128}", reference_id):
         raise BuildError("--auth requires --reference-id from the token-store registration")
     return {"authorization": {"type": AUTH_TYPES[auth], "referenceId": reference_id}}
+
+
+def bridge_endpoint(bridge, site, profile, toolsets=None, subdomain=None):
+    """Connector URL on the Datadog OAuth bridge (cowork/bridge): <bridge>/mcp plus the same query
+    (toolsets, omit_tools, subdomain) the direct Datadog URL would carry; the bridge forwards it upstream."""
+    if not re.fullmatch(r"https://[a-z0-9.-]+(:\d+)?/?", bridge or ""):
+        raise BuildError("--bridge must be the bridge base URL, e.g. https://datadog-mcp-bridge.example.com")
+    direct = endpoint(site, profile, toolsets, subdomain)
+    query = direct.split("?", 1)[1] if "?" in direct else ""
+    return bridge.rstrip("/") + "/mcp" + (f"?{query}" if query else "")
 
 
 def manifest(site, profile, toolsets=None, subdomain=None, app_uuid=None, auth=None, reference_id=None, mcp_url=None):
@@ -252,6 +262,7 @@ def main(argv=None):
     ap.add_argument("--app-id", help="override the manifest id (keep stable across versions)")
     ap.add_argument("--auth", choices=sorted(AUTH_TYPES), help="connector authorization: apikey (Datadog PAT as bearer via Microsoft token store), oauth, dcr; omit for Cowork automatic discovery")
     ap.add_argument("--mcp-url", help="override the connector URL (must match the auth config base URL)")
+    ap.add_argument("--bridge", help="Datadog OAuth bridge base URL (cowork/bridge); connector becomes <bridge>/mcp with the same tool filter")
     ap.add_argument("--reference-id", help="token-store registration id for --auth (Teams Developer Portal); not a secret")
     ap.add_argument("--output", help="ZIP path to create")
     ap.add_argument("--openplugin", help="write an Agent Plugins directory instead of a ZIP")
@@ -263,7 +274,10 @@ def main(argv=None):
         ap.error("--output is required unless --openplugin is used")
     if not SITES[a.site]["confirmed"]:
         print(f"warning: {a.site} endpoint is derived, not confirmed by Datadog docs: {SITES[a.site].get('note','')}")
-    print(build(a.site, a.profile, a.output, a.toolsets, a.subdomain, a.app_id, a.auth, a.reference_id, a.mcp_url))
+    if a.bridge and a.mcp_url:
+        ap.error("use --bridge or --mcp-url, not both")
+    mcp_url = bridge_endpoint(a.bridge, a.site, a.profile, a.toolsets, a.subdomain) if a.bridge else a.mcp_url
+    print(build(a.site, a.profile, a.output, a.toolsets, a.subdomain, a.app_id, a.auth, a.reference_id, mcp_url))
     return 0
 
 

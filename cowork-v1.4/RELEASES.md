@@ -12,7 +12,7 @@ statements: what did not work in the previous version, the evidence, and how thi
 | 1.4.3 | `OAuthPluginVault` (Datadog public client + PKCE) | Connect and Datadog consent OK; Microsoft token exchange failed |
 | 1.4.4 | `OAuthPluginVault` against Datadog's MCP authorization server (`/api/unstable/mcp-server`) | Installed; Connect opened Datadog, which returned "Invalid redirect_uri" before sign-in |
 | 1.4.5 | `OAuthPluginVault`, `app.datadoghq.com` sign-in, **PKCE off**, token at `/oauth2/v1/token` | Microsoft callback: `Error: 'invalid_request'` (Datadog requires PKCE for this client) |
-| 1.5.0 | `DynamicClientRegistration` via a Datadog OAuth bridge that runs the VS Code extension's flow server-side | Building |
+| 1.5.0 | `DynamicClientRegistration` via the Datadog OAuth bridge (`bridge/`), the VS Code extension's flow run server-side | Microsoft DCR registration at the bridge succeeded; package accepted and installed; Connect pending |
 | 1.4.6 | `ApiKeyPluginVault` (Datadog access token as bearer) | Pending API key registration ID |
 
 ## 1.4.0 (published in PR #3)
@@ -133,20 +133,39 @@ What the OAuth builds prove together (no further token-store variant is worth a 
 ## 1.5.0
 
 1. Did not work in 1.4.x: in every OAuth build, Microsoft's token store runs the OAuth exchange with
-   Datadog itself, and the two sides are incompatible (table above).
+   Datadog itself, and the two sides are incompatible (table above). Separately, the DCR configuration
+   used by 1.4.2 was created with `baseUrl`, which the Agents Toolkit v1.13 schema does not define for
+   `dcr/register`; the action takes `wellKnownAuthorizationServer` and `targetUrlsShouldStartWith`.
 2. Evidence: the live results above, plus Datadog's VS Code extension 2.37.0, which works because the
    extension's own code runs the flow: it signs in at `app.datadoghq.com` with PKCE S256, keeps the
    verifier, and posts `code_verifier` to Datadog's token endpoint. A Cowork plugin is declarative (manifest,
-   skills, connector) and cannot run that code.
-3. Fix: run the VS Code flow as a small service, the Datadog OAuth bridge (`cowork/bridge/`), and point
-   the plugin's connector at it. Toward Microsoft the bridge is a standard MCP authorization server: it
-   sends the `WWW-Authenticate` challenge, publishes RFC 9728/8414 metadata, and issues client secrets via
-   RFC 7591 registration, which is what Microsoft DCR requires. Toward Datadog it does what the VS Code
-   extension does: PKCE S256 sign-in, then a token exchange that includes `code_verifier`. Every MCP call is
+   skills, connector) and cannot run that code. Microsoft Learn ("Configure dynamic client registration",
+   2026-08-31): the token service reads the authorization server's RFC 8414 metadata and performs the
+   RFC 7591 registration server-side, and the server must issue a client secret.
+3. Fix: the plugin now carries the extension's sign-in as a service, the Datadog OAuth bridge
+   ([bridge/](bridge/README.md)), and the connector points at it. Toward Microsoft the bridge is a standard
+   MCP authorization server: it sends the `WWW-Authenticate` challenge, publishes RFC 9728/8414 metadata,
+   and issues client secrets via RFC 7591 registration. Toward Datadog it does what the VS Code extension
+   does: PKCE S256 sign-in, then a token exchange that includes `code_verifier`. Every MCP call is
    forwarded to `https://mcp.datadoghq.com/v1/mcp` with the signed-in user's own Datadog token. The bridge
-   keeps no token store: codes and refresh tokens are sealed with AES-256-GCM.
+   keeps no token store: codes and refresh tokens are sealed with AES-256-GCM. `register/dcr` creates the
+   DCR configuration with the fields the schema defines.
 
-Live result: pending.
+Verified so far (2026-09-30 UTC):
+- 20 end-to-end tests against a mock Datadog pass, including the Microsoft pattern (secret-authenticated
+  token request without `code_verifier`) and SSE streaming.
+- Live against Datadog US1: discovery, public client registration with the bridge callback, and the
+  302 to `app.datadoghq.com/oauth2/v1/authorize` with the bridge's S256 challenge.
+- Deployed to Azure Container Apps (single replica). `POST /mcp` without a token returns 401 with
+  `WWW-Authenticate: Bearer resource_metadata=".../.well-known/oauth-protected-resource/mcp"`.
+- `atk provision` (`dcr/register`): Microsoft's token service fetched the bridge's
+  `/.well-known/oauth-authorization-server` and registered a client at `/register`
+  (`client_secret_basic`, 201, secret issued, no redirect URI rejected). First DCR registration Microsoft
+  has completed for this plugin.
+- `atk install` of `datadog-cowork-1.5.0-us1-readonly-bridge-dcr.zip` accepted by the package service
+  after `atk uninstall` of the 1.4.5 title.
+
+Live result: Connect and a Datadog read in Cowork pending.
 
 ## 1.4.6
 

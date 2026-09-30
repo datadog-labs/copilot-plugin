@@ -1,0 +1,23 @@
+# yaml-language-server: $schema=https://aka.ms/m365-agents-toolkits/v1.13/yaml.schema.json
+# Registers the Datadog OAuth bridge (bridge/) with Microsoft's Enterprise Token Store as a Dynamic
+# Client Registration configuration. Microsoft's token service reads the bridge's RFC 8414 metadata and
+# registers a confidential client at the bridge's /register (the bridge issues the secret, which Microsoft
+# DCR requires and Datadog's own registration endpoint never does).
+#   atk provision --env dev          (from this folder, after bridge/deploy/Deploy-Bridge.ps1)
+# Output: DATADOG_DCR_CONFIGURATION_ID in env/.env.dev -> build.py --auth dcr --reference-id <id>
+version: v1.13
+environmentFolderPath: ./env
+
+provision:
+  - uses: dcr/register
+    with:
+      name: Datadog for Copilot Cowork (bridge DCR)
+      appId: ${{TEAMS_APP_ID}}
+      wellKnownAuthorizationServer: ${{DATADOG_BRIDGE_URL}}/.well-known/oauth-authorization-server
+      targetUrlsShouldStartWith:
+        - ${{DATADOG_BRIDGE_URL}}/mcp
+      applicableToApps: AnyApp
+      targetAudience: HomeTenant
+    writeToEnvironmentFile:
+      configurationId: DATADOG_DCR_CONFIGURATION_ID
+projectId: 54f36b84-69c4-4c87-b56c-4edc769021e7
