@@ -1,3 +1,4 @@
+#Requires -Version 7.2
 <#
 .SYNOPSIS
   Build the Datadog OAuth bridge image in Azure Container Registry and run it on Azure Container Apps.
@@ -8,7 +9,8 @@
     - exactly one replica (authorization-code replay protection is in memory)
     - BRIDGE_SECRET generated here with a CSPRNG and stored only as a Container Apps secret
   Later runs only roll the image; the secret, and therefore every issued client and refresh token, is kept.
-  Nothing secret is printed or written to disk.
+  Nothing secret is printed or written to disk. The secret is passed to az on its command line once, at
+  creation; use a Key Vault reference (keyvaultref:) instead where process listings are audited.
 
 .EXAMPLE
   ./Deploy-Bridge.ps1 -SubscriptionId <sub> -ResourceGroup rg-app -ContainerAppsEnvironment cae-app -AcrName myacr `
@@ -53,9 +55,12 @@ if ($PSCmdlet.ShouldProcess($image, 'az acr build')) {
   Invoke-Az acr build --registry $AcrName --image "datadog-cowork-bridge:$ImageTag" $bridgeDir --only-show-errors | Out-Null
 }
 
-$exists = $false
-& az containerapp show -g $ResourceGroup -n $AppName --query name -o tsv 2>$null | Out-Null
+# Create only when Azure says the app does not exist: a transient failure must never lead to a create that
+# would replace BRIDGE_SECRET (and sign every user out).
+$showOut = & az containerapp show -g $ResourceGroup -n $AppName --query name -o tsv 2>&1
 if ($LASTEXITCODE -eq 0) { $exists = $true }
+elseif (($showOut | Out-String) -match 'ResourceNotFound|was not found|could not be found') { $exists = $false }
+else { throw "Could not check whether container app $AppName exists (az containerapp show failed); nothing was changed." }
 
 if (-not $exists) {
   if ($PSCmdlet.ShouldProcess($AppName, 'az containerapp create')) {

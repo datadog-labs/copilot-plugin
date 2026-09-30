@@ -47,6 +47,45 @@ export function sendPage(res, status, title, message) {
   res.end(html);
 }
 
+/** The bridge's own consent step: the user confirms before the browser is sent to Datadog. */
+export function sendConsentPage(res, { consent, redirectHost, site }) {
+  const html = '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
+    + '<title>Connect Datadog</title><style>'
+    + 'body{font-family:system-ui,sans-serif;max-width:32rem;margin:4rem auto;padding:0 1rem;line-height:1.5;color:#1f1f1f}'
+    + 'h1{font-size:1.25rem}dl{display:grid;grid-template-columns:auto 1fr;gap:.25rem 1rem}dt{color:#555}dd{margin:0;word-break:break-all}'
+    + 'form{display:flex;gap:.75rem;margin-top:1.5rem}button{font:inherit;padding:.5rem 1rem;border-radius:.375rem;border:1px solid #632ca6;cursor:pointer}'
+    + '.allow{background:#632ca6;color:#fff}.deny{background:#fff;color:#632ca6}</style></head><body>'
+    + '<h1>Connect your Datadog account</h1>'
+    + '<p>An app is asking to use Datadog MCP with your Datadog account. You will sign in at Datadog next; tools act with your Datadog permissions.</p>'
+    + `<dl><dt>Returns to</dt><dd>${escapeHtml(redirectHost)}</dd><dt>Datadog site</dt><dd>${escapeHtml(site)}</dd></dl>`
+    + '<p>Continue only if you just clicked <strong>Connect</strong> for the Datadog plugin in Microsoft 365 Copilot.</p>'
+    + `<form method="post" action="/authorize"><input type="hidden" name="consent" value="${escapeHtml(consent)}">`
+    + '<button class="allow" type="submit" name="decision" value="allow">Continue to Datadog</button>'
+    + '<button class="deny" type="submit" name="decision" value="deny">Cancel</button></form></body></html>';
+  res.writeHead(200, {
+    'content-type': 'text/html; charset=utf-8',
+    'content-length': Buffer.byteLength(html),
+    'cache-control': 'no-store',
+    'content-security-policy': "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'",
+  });
+  res.end(html);
+}
+
+export function parseCookies(header) {
+  const out = {};
+  for (const part of String(header || '').split(';')) {
+    const i = part.indexOf('=');
+    if (i < 1) continue;
+    const k = part.slice(0, i).trim();
+    if (!(k in out)) out[k] = part.slice(i + 1).trim();
+  }
+  return out;
+}
+
+export function serializeCookie(name, value, { secure, maxAge }) {
+  return `${name}=${value}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${secure ? '; Secure' : ''}`;
+}
+
 export function redirect(res, location) {
   res.writeHead(302, { location, 'cache-control': 'no-store' });
   res.end();

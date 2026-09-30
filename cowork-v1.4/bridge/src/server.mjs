@@ -10,7 +10,7 @@
 //   GET  /.well-known/oauth-protected-resource[/mcp]   RFC 9728
 //   GET  /.well-known/oauth-authorization-server       RFC 8414 (also /.well-known/openid-configuration)
 //   POST /register                                     RFC 7591, issues client secrets
-//   GET  /authorize -> Datadog sign-in -> GET /callback -> Microsoft redirect with code
+//   GET  /authorize -> consent page -> POST /authorize -> Datadog sign-in -> GET /callback -> Microsoft
 //   POST /token                                        authorization_code, refresh_token
 //   POST|GET|DELETE /mcp                               Datadog MCP with the user's own Datadog token
 //   GET  /healthz
@@ -24,7 +24,7 @@ import { createProxy } from './proxy.mjs';
 import { HttpError, baseHeaders, parseQuery, readBody, sendJson, sendOAuthError } from './http.mjs';
 
 const OAUTH_BODY_LIMIT = 64 * 1024;
-const MCP_BODY_LIMIT = 5 * 1024 * 1024;
+const MCP_BODY_LIMIT = 1024 * 1024;
 const LEVELS = { debug: 10, info: 20, warn: 30, error: 40 };
 
 export function createLogger(level = 'info', sink = line => console.log(line)) {
@@ -50,6 +50,7 @@ export function createBridge(config, deps = {}) {
 
     if (path === '/mcp') {
       if (m !== 'POST' && m !== 'GET' && m !== 'DELETE') return methodNotAllowed(res, 'GET, POST, DELETE');
+      if (!proxy.hasBearer(req)) { res.setHeader('connection', 'close'); return proxy.unauthorized(res); } // no body is read
       const body = m === 'POST' ? await readBody(req, MCP_BODY_LIMIT) : undefined;
       return proxy.handle(req, res, body, url.search);
     }
@@ -67,8 +68,9 @@ export function createBridge(config, deps = {}) {
       return oauth.register(req, res, await readBody(req, OAUTH_BODY_LIMIT));
     }
     if (path === '/authorize') {
-      if (m !== 'GET') return methodNotAllowed(res, 'GET');
-      return oauth.authorize(req, res, parseQuery(url));
+      if (m === 'GET') return oauth.authorize(req, res, parseQuery(url));
+      if (m === 'POST') return oauth.authorizeConfirm(req, res, await readBody(req, OAUTH_BODY_LIMIT));
+      return methodNotAllowed(res, 'GET, POST');
     }
     if (path === '/callback') {
       if (m !== 'GET') return methodNotAllowed(res, 'GET');
@@ -110,8 +112,10 @@ export function createBridge(config, deps = {}) {
       sendOAuthError(res, 500, 'server_error', 'internal error');
     });
   });
-  server.requestTimeout = 0; // MCP SSE responses are long-lived; headersTimeout still applies
+  // requestTimeout bounds receiving the request only; long-lived SSE responses are unaffected.
+  server.requestTimeout = 60000;
   server.headersTimeout = 30000;
+  server.maxConnections = 1000;
   server.keepAliveTimeout = 65000;
 
   return { server, upstream, sealer };

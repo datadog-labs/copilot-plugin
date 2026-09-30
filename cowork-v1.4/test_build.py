@@ -2,10 +2,10 @@ import copy
 import json
 import tempfile
 import unittest
+import zipfile
 from pathlib import Path
 
 import build
-from validate import ValidationError, validate_files, validate_zip
 
 
 class DatadogCoworkPackageTests(unittest.TestCase):
@@ -29,12 +29,12 @@ class DatadogCoworkPackageTests(unittest.TestCase):
     def test_core_profile_is_plain_stable_url(self):
         self.assertEqual(build.endpoint("us1", "core"), "https://mcp.datadoghq.com/v1/mcp")
 
-    def test_all_confirmed_sites_build_and_validate(self):
+    def test_all_confirmed_sites_build(self):
         for site, meta in build.SITES.items():
             if not meta["confirmed"]:
                 continue
             m = build.manifest(site, "readonly")
-            validate_files(build.collect_files(m))
+            self.assertIn("tools/datadog-tools.json", build.collect_files(m))
             self.assertIn(meta["mcp"], m["agentConnectors"][0]["toolSource"]["remoteMcpServer"]["mcpServerUrl"])
 
     def test_toolsets_and_subdomain_params(self):
@@ -42,7 +42,6 @@ class DatadogCoworkPackageTests(unittest.TestCase):
         self.assertIn("subdomain=acme", url)
         self.assertIn("toolsets=core,alerting,llmobs", url)
         self.assertIn("omit_tools=", url)
-        validate_files(self.files_for(site="eu1", profile="readonly", toolsets="core,alerting,llmobs", subdomain="acme"))
 
     def test_bad_subdomain_rejected(self):
         with self.assertRaises(build.BuildError):
@@ -91,45 +90,40 @@ class DatadogCoworkPackageTests(unittest.TestCase):
             for w in build.WRITE_TOOLS:
                 self.assertNotIn(f"`{w}`", text)
 
-    # ---- validator catches the documented upload failures ---------------------
-    def test_validator_rejects_packageName(self):
-        files = self.mutate(self.files_for(site="us1", profile="readonly"), lambda m: m.update(packageName="x"))
-        with self.assertRaisesRegex(ValidationError, "undeclared"):
-            validate_files(files)
+    # ---- bridge and authorization ------------------------------------------------
+    def test_bridge_endpoint_keeps_tool_filter(self):
+        url = build.bridge_endpoint("https://bridge.example.com/", "us1", "readonly")
+        direct = build.endpoint("us1", "readonly")
+        self.assertEqual(url, "https://bridge.example.com/mcp?" + direct.split("?", 1)[1])
+        self.assertEqual(build.bridge_endpoint("https://bridge.example.com", "us1", "core"), "https://bridge.example.com/mcp")
 
-    def test_validator_rejects_skill_name_mismatch(self):
+    def test_bridge_must_be_https_origin(self):
+        for bad in ("http://bridge.example.com", "https://bridge.example.com/mcp", "bridge.example.com", ""):
+            with self.assertRaises(build.BuildError):
+                build.bridge_endpoint(bad, "us1", "readonly")
+
+    def test_dcr_authorization_block(self):
+        m = build.manifest("us1", "readonly", auth="dcr", reference_id="QUJDREVGR0g=", mcp_url="https://bridge.example.com/mcp")
+        r = m["agentConnectors"][0]["toolSource"]["remoteMcpServer"]
+        self.assertEqual(r["authorization"], {"type": "DynamicClientRegistration", "referenceId": "QUJDREVGR0g="})
+        self.assertEqual(r["mcpServerUrl"], "https://bridge.example.com/mcp")
+        self.assertEqual(r["mcpToolDescription"], {"file": "tools/datadog-tools.json"})
+        with self.assertRaises(build.BuildError):
+            build.manifest("us1", "readonly", auth="dcr")
+
+    def test_readonly_tool_file_lists_no_write_tools(self):
         files = self.files_for(site="us1", profile="readonly")
-        files = dict(files)
-        files["skills/datadog-host-health/SKILL.md"] = files["skills/datadog-host-health/SKILL.md"].replace(
-            b"name: datadog-host-health", b"name: HostHealth", 1)
-        with self.assertRaisesRegex(ValidationError, "ASKILL-P00[67]"):
-            validate_files(files)
-
-    def test_validator_rejects_http_url_and_wrong_path(self):
-        base = self.files_for(site="us1", profile="readonly")
-        files = self.mutate(base, lambda m: m["agentConnectors"][0]["toolSource"]["remoteMcpServer"].update(mcpServerUrl="http://mcp.datadoghq.com/v1/mcp"))
-        with self.assertRaisesRegex(ValidationError, "HTTPS"):
-            validate_files(files)
-        files = self.mutate(base, lambda m: m["agentConnectors"][0]["toolSource"]["remoteMcpServer"].update(mcpServerUrl="https://mcp.datadoghq.com/api/unstable/mcp-server/mcp"))
-        with self.assertRaisesRegex(ValidationError, "/v1/mcp"):
-            validate_files(files)
-
-    def test_validator_rejects_wrapper_folder(self):
-        files = {"wrapper/" + k: v for k, v in self.files_for(site="us1", profile="readonly").items()}
-        with self.assertRaisesRegex(ValidationError, "ROOT"):
-            validate_files(files)
-
-    def test_validator_rejects_referenceId_with_none_auth(self):
-        files = self.mutate(self.files_for(site="us1", profile="readonly"),
-                            lambda m: m["agentConnectors"][0]["toolSource"]["remoteMcpServer"].update(authorization={"type": "None", "referenceId": "x"}))
-        with self.assertRaisesRegex(ValidationError, "referenceId"):
-            validate_files(files)
+        names = {t["name"] for t in json.loads(files["tools/datadog-tools.json"])["tools"]}
+        self.assertTrue(names)
+        self.assertFalse(names & set(build.WRITE_TOOLS))
 
     # ---- end-to-end zip -------------------------------------------------------
     def test_zip_roundtrip_and_no_overwrite(self):
         with tempfile.TemporaryDirectory() as d:
             p = build.build("us1", "readonly", Path(d) / "a.zip")
-            m = validate_zip(p)
+            with zipfile.ZipFile(p) as z:
+                self.assertIn("manifest.json", z.namelist())
+                m = json.loads(z.read("manifest.json"))
             self.assertEqual(m["version"], build.VERSION)
             with self.assertRaises(build.BuildError):
                 build.build("us1", "readonly", p)

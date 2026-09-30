@@ -113,15 +113,35 @@ async function registerClient(extra = {}, b = base) {
   return res.json();
 }
 
+const cookieHeader = res => res.headers.getSetCookie().map(c => c.split(';')[0]).filter(c => !c.endsWith('=')).join('; ');
+
+/** GET /authorize: returns the consent page's sealed value and the CSRF cookie. */
+async function consentPage(client, { challenge, state = 'ms-state-123', b = base } = {}) {
+  const q = new URLSearchParams({ response_type: 'code', client_id: client.client_id, redirect_uri: MICROSOFT_REDIRECT, state, scope: 'mcp_read' });
+  if (challenge) { q.set('code_challenge', challenge); q.set('code_challenge_method', 'S256'); }
+  const page = await fetch(`${b}/authorize?${q}`, { redirect: 'manual' });
+  assert.equal(page.status, 200);
+  const html = await page.text();
+  const consent = /name="consent" value="([^"]+)"/.exec(html)[1].replace(/&amp;/g, '&');
+  return { consent, cookie: cookieHeader(page), html };
+}
+
+/** Consent page -> Continue -> 302 to Datadog. Returns the Datadog URL and the browser's cookies. */
+async function toDatadog(client, opts = {}) {
+  const { consent, cookie } = await consentPage(client, opts);
+  const r = await fetch(`${opts.b || base}/authorize`, {
+    method: 'POST', redirect: 'manual', headers: { 'content-type': 'application/x-www-form-urlencoded', cookie }, body: new URLSearchParams({ consent, decision: 'allow' }),
+  });
+  assert.equal(r.status, 302);
+  return { location: r.headers.get('location'), cookie: cookieHeader(r) };
+}
+
 /** Full Microsoft-side flow up to the downstream authorization code. */
 async function signIn(client, { challenge, b = base } = {}) {
-  const q = new URLSearchParams({ response_type: 'code', client_id: client.client_id, redirect_uri: MICROSOFT_REDIRECT, state: 'ms-state-123', scope: 'mcp_read' });
-  if (challenge) { q.set('code_challenge', challenge); q.set('code_challenge_method', 'S256'); }
-  const a = await fetch(`${b}/authorize?${q}`, { redirect: 'manual' });
-  assert.equal(a.status, 302);
-  const dd1 = datadogSignIn(a.headers.get('location'));
+  const { location, cookie } = await toDatadog(client, { challenge, b });
+  const dd1 = datadogSignIn(location);
   assert.equal(dd1.redirectUri, `${b}/callback`);
-  const cb = await fetch(`${b}/callback?code=${dd1.code}&state=${encodeURIComponent(dd1.state)}`, { redirect: 'manual' });
+  const cb = await fetch(`${b}/callback?code=${dd1.code}&state=${encodeURIComponent(dd1.state)}`, { redirect: 'manual', headers: { cookie } });
   assert.equal(cb.status, 302);
   const back = new URL(cb.headers.get('location'));
   assert.equal(back.origin + back.pathname, MICROSOFT_REDIRECT);
@@ -186,16 +206,41 @@ test('authorize never redirects for an unknown client or disallowed redirect_uri
   assert.equal(r3.status, 400);
 });
 
-test('authorize redirects to Datadog with the bridge PKCE challenge and scope', async () => {
+test('authorize shows the bridge consent page, then redirects to Datadog with the bridge PKCE challenge', async () => {
   const c = await registerClient();
-  const r = await get(`/authorize?response_type=code&client_id=${c.client_id}&redirect_uri=${encodeURIComponent(MICROSOFT_REDIRECT)}&state=s1`);
-  assert.equal(r.status, 302);
-  const s = datadogSignIn(r.headers.get('location'));
+  const page = await consentPage(c, { state: 's1' });
+  assert.match(page.html, /Continue to Datadog/);
+  assert.match(page.html, /teams\.microsoft\.com/);
+  assert.match(page.cookie, /^ddb_csrf=/);
+  const { location } = await toDatadog(c, { state: 's1' });
+  const s = datadogSignIn(location);
   assert.equal(s.scope, 'mcp_read');
   assert.ok(dd.registered.some(m => m.redirect_uris[0] === `${base}/callback` && m.token_endpoint_auth_method === 'none'));
   const bad = await get(`/authorize?response_type=token&client_id=${c.client_id}&redirect_uri=${encodeURIComponent(MICROSOFT_REDIRECT)}&state=s2`);
   assert.equal(bad.status, 302);
   assert.equal(new URL(bad.headers.get('location')).searchParams.get('error'), 'unsupported_response_type');
+  const plain = await get(`/authorize?response_type=code&client_id=${c.client_id}&redirect_uri=${encodeURIComponent(MICROSOFT_REDIRECT)}&state=s3&code_challenge=${'a'.repeat(43)}&code_challenge_method=plain`);
+  assert.equal(new URL(plain.headers.get('location')).searchParams.get('error'), 'invalid_request', 'PKCE plain is rejected');
+  const long = await get(`/authorize?response_type=code&client_id=${c.client_id}&redirect_uri=${encodeURIComponent(MICROSOFT_REDIRECT)}&state=${'x'.repeat(9000)}`);
+  assert.equal(new URL(long.headers.get('location')).searchParams.get('error'), 'invalid_request', 'over-long state is rejected, not cut');
+});
+
+test('consent is CSRF-protected, can be cancelled, and the callback is bound to the confirming browser', async () => {
+  const c = await registerClient();
+  const { consent, cookie } = await consentPage(c, { state: 'cs' });
+  const post = (form, headers = {}) => fetch(base + '/authorize', { method: 'POST', redirect: 'manual', headers: { 'content-type': 'application/x-www-form-urlencoded', ...headers }, body: new URLSearchParams(form) });
+  let r = await post({ consent, decision: 'allow' });
+  assert.equal(r.status, 400, 'no CSRF cookie: an attacker cannot auto-submit the consent');
+  r = await post({ consent, decision: 'allow' }, { cookie: 'ddb_csrf=' + b64u(randomBytes(18)) });
+  assert.equal(r.status, 400, 'CSRF cookie from another page view');
+  r = await post({ consent, decision: 'deny' }, { cookie });
+  assert.equal(new URL(r.headers.get('location')).searchParams.get('error'), 'access_denied');
+  // A victim who never confirmed cannot complete an attacker's Datadog sign-in.
+  const attacker = await toDatadog(c, { state: 'attacker' });
+  const s = datadogSignIn(attacker.location);
+  r = await get(`/callback?code=${s.code}&state=${encodeURIComponent(s.state)}`);
+  assert.equal(r.status, 400);
+  assert.equal(r.headers.get('location'), null);
 });
 
 // ---------- full flow ----------
@@ -263,31 +308,33 @@ test('public client (no secret) must present a valid verifier', async () => {
 
 test('state and code are purpose-bound: a sealed state is not a code', async () => {
   const c = await registerClient();
-  const r = await get(`/authorize?response_type=code&client_id=${c.client_id}&redirect_uri=${encodeURIComponent(MICROSOFT_REDIRECT)}&state=s`);
-  const state = new URL(r.headers.get('location')).searchParams.get('state');
+  const { location, cookie } = await toDatadog(c, { state: 's' });
+  const state = new URL(location).searchParams.get('state');
   const t = await postForm('/token', { grant_type: 'authorization_code', code: state, client_id: c.client_id, client_secret: c.client_secret });
   assert.equal((await t.json()).error, 'invalid_grant');
-  const cb = await get(`/callback?code=x&state=${encodeURIComponent(state.slice(0, -3) + 'AAA')}`);
+  const cb = await get(`/callback?code=x&state=${encodeURIComponent(state.slice(0, -3) + 'AAA')}`, { headers: { cookie } });
   assert.equal(cb.status, 400);
   assert.equal(cb.headers.get('location'), null);
 });
 
 test('Datadog errors and failed exchanges return to Microsoft as OAuth errors', async () => {
   const c = await registerClient();
-  const r = await get(`/authorize?response_type=code&client_id=${c.client_id}&redirect_uri=${encodeURIComponent(MICROSOFT_REDIRECT)}&state=s9`);
-  const s = datadogSignIn(r.headers.get('location'));
-  const denied = await get(`/callback?error=access_denied&error_description=User%20denied&state=${encodeURIComponent(s.state)}`);
+  const { location, cookie } = await toDatadog(c, { state: 's9' });
+  const s = datadogSignIn(location);
+  const denied = await get(`/callback?error=access_denied&error_description=User%20denied&state=${encodeURIComponent(s.state)}`, { headers: { cookie } });
   const u = new URL(denied.headers.get('location'));
   assert.equal(u.searchParams.get('error'), 'access_denied');
   assert.equal(u.searchParams.get('state'), 's9');
-  const failed = await get(`/callback?code=not-a-real-code&state=${encodeURIComponent(s.state)}`);
+  const again = await toDatadog(c, { state: 's9' });
+  const s2 = datadogSignIn(again.location);
+  const failed = await get(`/callback?code=not-a-real-code&state=${encodeURIComponent(s2.state)}`, { headers: { cookie: again.cookie } });
   assert.equal(new URL(failed.headers.get('location')).searchParams.get('error'), 'server_error');
 });
 
 test('refresh_token grant refreshes at Datadog and rotates the sealed refresh token', async () => {
   const c = await registerClient();
   const { code } = await signIn(c, {});
-  const tok = await (await postForm('/token', { grant_type: 'authorization_code', code, client_id: c.client_id, client_secret: c.client_secret })).json();
+  const tok = await (await postForm('/token', { grant_type: 'authorization_code', code, redirect_uri: MICROSOFT_REDIRECT, client_id: c.client_id, client_secret: c.client_secret })).json();
   const r = await postForm('/token', { grant_type: 'refresh_token', refresh_token: tok.refresh_token, client_id: c.client_id, client_secret: c.client_secret });
   assert.equal(r.status, 200);
   const t2 = await r.json();
@@ -297,6 +344,23 @@ test('refresh_token grant refreshes at Datadog and rotates the sealed refresh to
   const other = await registerClient();
   const stolen = await postForm('/token', { grant_type: 'refresh_token', refresh_token: tok.refresh_token, client_id: other.client_id, client_secret: other.client_secret });
   assert.equal((await stolen.json()).error, 'invalid_grant');
+  const noSecret = await postForm('/token', { grant_type: 'refresh_token', refresh_token: t2.refresh_token, client_id: c.client_id });
+  assert.equal(noSecret.status, 401, 'refresh requires the client secret');
+});
+
+test('token endpoint request rules: redirect_uri binding, one auth method, grant_type required', async () => {
+  const c = await registerClient();
+  const { code } = await signIn(c, {});
+  let r = await postForm('/token', { grant_type: 'authorization_code', code, client_id: c.client_id, client_secret: c.client_secret });
+  assert.equal((await r.json()).error, 'invalid_grant', 'redirect_uri was sent to /authorize, so it is required');
+  const basic = Buffer.from(`${c.client_id}:${c.client_secret}`).toString('base64');
+  r = await postForm('/token', { grant_type: 'authorization_code', code, redirect_uri: MICROSOFT_REDIRECT, client_secret: c.client_secret }, { authorization: `Basic ${basic}` });
+  assert.equal((await r.json()).error, 'invalid_request');
+  r = await postForm('/token', { code, client_id: c.client_id, client_secret: c.client_secret });
+  assert.equal((await r.json()).error, 'invalid_request');
+  r = await postForm('/token', { grant_type: 'authorization_code', code, redirect_uri: MICROSOFT_REDIRECT, client_id: c.client_id, client_secret: c.client_secret });
+  const tok = await r.json();
+  assert.ok(tok.expires_in <= 3600 && tok.expires_in >= 3590);
 });
 
 test('strict mode requires the downstream verifier', async () => {
@@ -305,7 +369,7 @@ test('strict mode requires the downstream verifier', async () => {
     const c = await registerClient({}, strict.base);
     const verifier = b64u(randomBytes(32));
     const { code } = await signIn(c, { challenge: s256(verifier), b: strict.base });
-    const r = await postForm('/token', { grant_type: 'authorization_code', code, client_id: c.client_id, client_secret: c.client_secret }, {}, strict.base);
+    const r = await postForm('/token', { grant_type: 'authorization_code', code, redirect_uri: MICROSOFT_REDIRECT, client_id: c.client_id, client_secret: c.client_secret }, {}, strict.base);
     assert.equal((await r.json()).error, 'invalid_grant');
   } finally { strict.server.close(); }
 });
@@ -314,6 +378,7 @@ test('strict mode requires the downstream verifier', async () => {
 test('/mcp without a bearer token returns 401 with the resource_metadata challenge', async () => {
   const r = await fetch(base + '/mcp', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' });
   assert.equal(r.status, 401);
+  assert.equal(r.headers.get('connection'), 'close');
   assert.equal(r.headers.get('www-authenticate'), `Bearer resource_metadata="${base}/.well-known/oauth-protected-resource/mcp", scope="mcp_read"`);
 });
 

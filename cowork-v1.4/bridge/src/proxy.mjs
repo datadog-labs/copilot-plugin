@@ -1,15 +1,19 @@
 // MCP endpoint: challenge unauthenticated callers (the WWW-Authenticate header Datadog's own MCP server
 // omits), then forward MCP Streamable HTTP to Datadog's MCP server with the caller's Datadog bearer token.
 // Only the configured upstream URL is ever contacted; the request path never selects a target.
-import { Readable } from 'node:stream';
+import { Readable, pipeline } from 'node:stream';
 import { sendJson } from './http.mjs';
 
 const FORWARD_REQUEST = ['authorization', 'content-type', 'accept', 'mcp-session-id', 'mcp-protocol-version', 'last-event-id', 'user-agent'];
-const FORWARD_RESPONSE = ['content-type', 'mcp-session-id', 'mcp-protocol-version', 'cache-control'];
+const FORWARD_RESPONSE = ['content-type', 'mcp-session-id', 'mcp-protocol-version', 'cache-control', 'www-authenticate'];
+const BEARER = /^Bearer\s+[A-Za-z0-9._~+/=-]+\s*$/i;
 
 export function createProxy(config, { fetch: fetchImpl = globalThis.fetch, log }) {
   const metadataUrl = `${config.baseUrl}/.well-known/oauth-protected-resource/mcp`;
   const scope = config.upstreamScope ? `, scope="${config.upstreamScope}"` : '';
+
+  /** True when the request carries a bearer token; checked before any request body is read. */
+  const hasBearer = req => BEARER.test(req.headers.authorization || '');
 
   function unauthorized(res, error) {
     const challenge = error
@@ -20,8 +24,7 @@ export function createProxy(config, { fetch: fetchImpl = globalThis.fetch, log }
   }
 
   async function handle(req, res, body, search) {
-    const auth = req.headers.authorization || '';
-    if (!/^Bearer\s+[A-Za-z0-9._~+/=-]+\s*$/i.test(auth)) return unauthorized(res);
+    if (!hasBearer(req)) return unauthorized(res);
 
     const target = new URL(config.upstreamMcpUrl);
     for (const [k, v] of new URLSearchParams(search)) target.searchParams.set(k, v);
@@ -60,10 +63,10 @@ export function createProxy(config, { fetch: fetchImpl = globalThis.fetch, log }
     res.writeHead(upstream.status, out);
     if (!upstream.body) return res.end();
     res.flushHeaders?.();
-    const stream = Readable.fromWeb(upstream.body);
-    stream.on('error', () => res.destroy());
-    stream.pipe(res);
+    pipeline(Readable.fromWeb(upstream.body), res, err => {
+      if (err && !abort.signal.aborted) log('warn', 'mcp_stream_error', { reason: err.code || err.message });
+    });
   }
 
-  return { handle, unauthorized };
+  return { handle, hasBearer, unauthorized };
 }

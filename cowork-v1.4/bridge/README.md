@@ -22,6 +22,8 @@ sequenceDiagram
   B-->>C: client_id + client_secret (Microsoft DCR requires a secret)
   Note over C,D: User clicks Connect
   C->>B: GET /authorize (Microsoft callback, state, PKCE)
+  B-->>C: bridge consent page (user clicks Continue to Datadog)
+  C->>B: POST /authorize (CSRF cookie)
   B->>D: 302 to app.datadoghq.com/oauth2/v1/authorize with the bridge's own S256 challenge
   D-->>B: GET /callback?code (after the user signs in to Datadog)
   B->>D: POST token endpoint with code_verifier (what Microsoft's token store never sends)
@@ -40,9 +42,10 @@ sequenceDiagram
 | `GET /.well-known/oauth-protected-resource[/mcp]` | RFC 9728 metadata: resource `<base>/mcp`, authorization server `<base>` |
 | `GET /.well-known/oauth-authorization-server` | RFC 8414 metadata (also `/.well-known/openid-configuration`) |
 | `POST /register` | RFC 7591 registration. Issues `client_secret` (HMAC-derived, stateless). Redirect URIs must be on the allowlist |
-| `GET /authorize` | Validates client and redirect URI (never redirects to an unvalidated URI), then sends the browser to Datadog sign-in with the bridge's PKCE pair |
-| `GET /callback` | Exchanges Datadog's code with `code_verifier`, then returns a sealed code to the Microsoft callback |
-| `POST /token` | `authorization_code` (single use) and `refresh_token`; `client_secret_post` or `client_secret_basic` |
+| `GET /authorize` | Validates client, redirect URI (never redirects to an unvalidated URI), S256 PKCE and state, then shows the bridge's consent page |
+| `POST /authorize` | Consent confirmed (CSRF cookie checked): sends the browser to Datadog sign-in with the bridge's PKCE pair and a browser-binding cookie |
+| `GET /callback` | Requires the browser-binding cookie, exchanges Datadog's code with `code_verifier`, then returns a sealed code to the Microsoft callback |
+| `POST /token` | `authorization_code` (single use, `redirect_uri` bound) and `refresh_token` (client secret required); one of `client_secret_post` or `client_secret_basic` |
 | `POST/GET/DELETE /mcp` | 401 with `WWW-Authenticate: Bearer resource_metadata=...` when unauthenticated; otherwise streams to Datadog's MCP server with the caller's token |
 | `GET /healthz` | Liveness |
 
@@ -67,13 +70,22 @@ sequenceDiagram
   `BRIDGE_SECRET` through HKDF-SHA256 with separate labels for sealing, client IDs and client secrets.
 - **Users act as themselves.** Each user signs in to Datadog; the access token Microsoft stores is that
   user's Datadog token, and Datadog enforces the user's role and the `mcp_read`/`mcp_write` scopes.
+- **Consent and browser binding.** Every client shares one Datadog client, so the bridge asks the user to
+  confirm each connection on its own page (CSRF-protected POST), and the Datadog callback is accepted
+  only in the browser that confirmed it. A link crafted by someone else cannot complete silently in a
+  victim's browser even when the victim has a live Datadog session (MCP security best practices,
+  "Confused deputy").
 - **Redirects.** Only allowlisted redirect URIs are ever used; a bad client or redirect URI gets an
   error page, not a redirect.
-- **PKCE.** The bridge always uses PKCE S256 with Datadog. Toward Microsoft, a sent `code_verifier` must
-  match; Microsoft's token store omits it, so a client that authenticates with its secret is accepted
-  without it (logged as `token_pkce_verifier_omitted_by_confidential_client`). Clients without a secret
-  must send a valid verifier.
+- **PKCE.** The bridge always uses PKCE S256 with Datadog, and accepts only S256 from clients. A sent
+  `code_verifier` must match; Microsoft's token store omits it, so a client that authenticates with its
+  secret is accepted without it (logged as `token_pkce_verifier_omitted_by_confidential_client`). This is
+  the RFC 9700 downgrade case, accepted for Microsoft and closed by `REQUIRE_DOWNSTREAM_PKCE=true`.
+  Clients without a secret must send a valid verifier and cannot refresh.
+- **Limits.** `/mcp` checks for a bearer token before reading any body (1 MB cap); request receive
+  timeout 60 s; 1000 connections; OAuth bodies 64 KB; state 8 KB.
 - **Codes** live 5 minutes and are single use (in memory, which is why the deployment runs one replica).
+  Sealed refresh tokens expire after 90 days and carry the Datadog client they were issued for.
 - **Logs** hold event names, client IDs, paths and status codes; never tokens, codes or secrets.
 
 ## Deploy (Azure Container Apps)

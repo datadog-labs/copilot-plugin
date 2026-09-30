@@ -165,6 +165,20 @@ Verified so far (2026-09-30 UTC):
 - `atk install` of `datadog-cowork-1.5.0-us1-readonly-bridge-dcr.zip` accepted by the package service
   after `atk uninstall` of the 1.4.5 title.
 
+Security review before the live test (independent reviewer, 2026-09-30) and fixes, redeployed with the
+same `BRIDGE_SECRET` (Microsoft's registered client still valid):
+- Blocker, confused deputy (one shared Datadog client for all callers): the bridge now shows its own
+  consent page (CSRF-protected POST) and binds the Datadog callback to the confirming browser.
+- Refresh now requires the client secret; `/mcp` checks for a token before reading a body; request
+  timeout and connection cap; S256-only PKCE; `redirect_uri` binding at `/token`; one client
+  authentication method per request; over-long `state` rejected instead of cut; refresh-token expiry;
+  `expires_in` reduced by the time the code waited; discovery retried after a fallback; deploy script
+  creates only on a confirmed "not found".
+- Not changed: "a new Datadog client is registered on every start". Datadog's registration endpoint
+  returns the same shared client ID every time (verified live), so restarts do not invalidate sign-ins;
+  the client ID is now sealed into state and refresh tokens anyway.
+- 22 end-to-end tests pass.
+
 Live result: Connect and a Datadog read in Cowork pending.
 
 ## 1.4.6

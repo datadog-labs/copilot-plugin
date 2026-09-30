@@ -2,10 +2,22 @@
 // token calls. This is the part of the Datadog VS Code extension's sign-in that Microsoft's token store
 // cannot do: it always sends the PKCE code_verifier that matches the challenge used at sign-in.
 
+const REDISCOVER_AFTER = 60; // seconds before retrying discovery after a fallback
+
 export function createUpstream(config, { fetch: fetchImpl = globalThis.fetch, log } = {}) {
   let metadata = null;
+  let discovered = false;
+  let nextDiscovery = 0;
   let clientId = config.upstreamClientId || null;
   let pending = null;
+
+  const allowedEndpoint = value => {
+    if (typeof value !== 'string') return false;
+    try {
+      const u = new URL(value);
+      return u.protocol === 'https:' || (u.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(u.hostname));
+    } catch { return false; }
+  };
 
   async function discover() {
     try {
@@ -13,11 +25,15 @@ export function createUpstream(config, { fetch: fetchImpl = globalThis.fetch, lo
       if (!res.ok) throw new Error(`status ${res.status}`);
       const doc = await res.json();
       for (const key of ['authorization_endpoint', 'token_endpoint']) {
-        if (typeof doc[key] !== 'string' || !/^https?:\/\//.test(doc[key])) throw new Error(`metadata missing ${key}`);
+        if (!allowedEndpoint(doc[key])) throw new Error(`metadata ${key} missing or not https`);
       }
+      if (doc.registration_endpoint !== undefined && !allowedEndpoint(doc.registration_endpoint)) throw new Error('metadata registration_endpoint not https');
+      discovered = true;
       return doc;
     } catch (err) {
       log?.('warn', 'upstream_discovery_fallback', { reason: err.message });
+      discovered = false;
+      nextDiscovery = Math.floor(Date.now() / 1000) + REDISCOVER_AFTER;
       return { ...config.upstreamFallback };
     }
   }
@@ -44,10 +60,11 @@ export function createUpstream(config, { fetch: fetchImpl = globalThis.fetch, lo
 
   /** Discovery + registration once; retried on the next request if Datadog was unreachable. */
   function ready() {
-    if (metadata && clientId) return Promise.resolve({ metadata, clientId });
+    const stale = !discovered && Math.floor(Date.now() / 1000) >= nextDiscovery;
+    if (metadata && clientId && !stale) return Promise.resolve({ metadata, clientId });
     if (!pending) {
       pending = (async () => {
-        metadata = metadata || await discover();
+        if (!metadata || stale) metadata = await discover();
         clientId = clientId || await register(metadata);
         return { metadata, clientId };
       })().finally(() => { pending = null; });
@@ -55,11 +72,11 @@ export function createUpstream(config, { fetch: fetchImpl = globalThis.fetch, lo
     return pending;
   }
 
-  async function authorizeUrl({ state, challenge }) {
-    const { metadata: m, clientId: id } = await ready();
-    const url = new URL(m.authorization_endpoint);
+  /** Datadog sign-in URL; call after ready() so the client_id sealed into state is the one used here. */
+  function authorizeUrl({ state, challenge, clientId: id }) {
+    const url = new URL(metadata.authorization_endpoint);
     url.searchParams.set('response_type', 'code');
-    url.searchParams.set('client_id', id);
+    url.searchParams.set('client_id', id || clientId);
     url.searchParams.set('redirect_uri', config.callbackUrl);
     url.searchParams.set('state', state);
     url.searchParams.set('code_challenge', challenge);
@@ -68,9 +85,9 @@ export function createUpstream(config, { fetch: fetchImpl = globalThis.fetch, lo
     return url.toString();
   }
 
-  async function tokenCall(params) {
-    const { metadata: m, clientId: id } = await ready();
-    const body = new URLSearchParams({ ...params, client_id: id });
+  async function tokenCall(params, id) {
+    const { metadata: m, clientId: current } = await ready();
+    const body = new URLSearchParams({ ...params, client_id: id || current });
     const res = await fetchImpl(m.token_endpoint, {
       method: 'POST',
       headers: { 'content-type': 'application/x-www-form-urlencoded', accept: 'application/json' },
@@ -82,7 +99,7 @@ export function createUpstream(config, { fetch: fetchImpl = globalThis.fetch, lo
       // Datadog error codes are not secret; tokens never reach the log.
       const err = new Error('Datadog token endpoint rejected the request');
       err.status = res.status;
-      err.upstreamError = typeof json.error === 'string' ? json.error : undefined;
+      err.upstreamError = typeof json.error === 'string' ? json.error.slice(0, 64) : undefined;
       err.upstreamDescription = typeof json.error_description === 'string' ? json.error_description.slice(0, 200) : undefined;
       throw err;
     }
@@ -97,8 +114,8 @@ export function createUpstream(config, { fetch: fetchImpl = globalThis.fetch, lo
   return {
     ready,
     authorizeUrl,
-    exchangeCode: ({ code, verifier }) => tokenCall({ grant_type: 'authorization_code', code, redirect_uri: config.callbackUrl, code_verifier: verifier }),
-    refresh: refreshToken => tokenCall({ grant_type: 'refresh_token', refresh_token: refreshToken }),
+    exchangeCode: ({ code, verifier, clientId: id }) => tokenCall({ grant_type: 'authorization_code', code, redirect_uri: config.callbackUrl, code_verifier: verifier }, id),
+    refresh: (refreshToken, id) => tokenCall({ grant_type: 'refresh_token', refresh_token: refreshToken }, id),
     get clientId() { return clientId; },
   };
 }
