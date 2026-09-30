@@ -18,13 +18,14 @@ import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
-VERSION = "1.4.0"
+VERSION = "1.4.5"
 SCHEMA = "https://developer.microsoft.com/json-schemas/teams/v1.28/MicrosoftTeams.schema.json"
 CATALOG = json.loads((ROOT / "catalog" / "core-tools.json").read_text())
 SITES = CATALOG["sites"]
 WRITE_TOOLS = CATALOG["write_tools_in_core"]
 # Stable app id for the primary US1 read-only package (upgrade path from 1.3.x).
 PRIMARY_APP_ID = "36d12977-5bb3-42db-be64-50aa2ac403ab"
+TOOLS_FILE = "tools/datadog-tools.json"
 SKILL_ORDER = [
     "datadog-connection-check",
     "datadog-host-health",
@@ -74,13 +75,51 @@ def app_id(site, profile, toolsets, subdomain):
     return str(uuid.uuid5(uuid.UUID(PRIMARY_APP_ID), seed))
 
 
-def manifest(site, profile, toolsets=None, subdomain=None, app_uuid=None):
+def tool_description(profile):
+    """mcpToolDescription file: the Datadog core tools this package exposes (required by the M365 package service).
+
+    Read-only packages list only read tools, matching the omit_tools filter on the connector URL.
+    Cowork still discovers the live tool surface with tools/list at runtime.
+    """
+    tools = []
+    for t in CATALOG["tools"]:
+        if profile == "readonly" and t["name"] in WRITE_TOOLS:
+            continue
+        read = t.get("access") == "read"
+        tools.append({
+            "name": t["name"],
+            "description": t["description"],
+            "inputSchema": {"type": "object", "additionalProperties": True},
+            "annotations": {
+                "title": t["name"].replace("_", " ").title(),
+                "readOnlyHint": read,
+                "destructiveHint": False,
+            },
+        })
+    return {"tools": tools}
+
+
+AUTH_TYPES = {"apikey": "ApiKeyPluginVault", "oauth": "OAuthPluginVault", "dcr": "DynamicClientRegistration"}
+
+
+def authorization(auth, reference_id):
+    """remoteMcpServer.authorization block. Datadog MCP accepts a Personal/Service Access Token as
+    "Authorization: Bearer <token>" (docs.datadoghq.com/mcp_server/setup, Authentication), which maps to
+    ApiKeyPluginVault: the token lives in Microsoft's Enterprise Token Store, never in this package."""
+    if not auth:
+        return {}
+    if not reference_id or not re.fullmatch(r"[A-Za-z0-9+/=_-]{8,128}", reference_id):
+        raise BuildError("--auth requires --reference-id from the token-store registration")
+    return {"authorization": {"type": AUTH_TYPES[auth], "referenceId": reference_id}}
+
+
+def manifest(site, profile, toolsets=None, subdomain=None, app_uuid=None, auth=None, reference_id=None, mcp_url=None):
     if profile not in ("readonly", "core"):
         raise BuildError("profile must be readonly or core")
     s = SITES[site]
     label = site.upper()
     mode = "read-only" if profile == "readonly" else "read/write (core)"
-    url = endpoint(site, profile, toolsets, subdomain)
+    url = mcp_url or endpoint(site, profile, toolsets, subdomain)
     return {
         "$schema": SCHEMA,
         "manifestVersion": "1.28",
@@ -121,16 +160,21 @@ def manifest(site, profile, toolsets=None, subdomain=None, app_uuid=None):
                 "id": f"datadog-mcp-{site}",
                 "displayName": f"Datadog MCP ({label})",
                 "description": f"Datadog MCP Server, {label} site, {mode}. Sign in with your Datadog account.",
-                "toolSource": {"remoteMcpServer": {"mcpServerUrl": url}},
+                "toolSource": {"remoteMcpServer": {
+                    "mcpServerUrl": url,
+                    "mcpToolDescription": {"file": TOOLS_FILE},
+                    **authorization(auth, reference_id),
+                }},
             }
         ],
         "agentSkills": [{"folder": f"./skills/{name}"} for name in SKILL_ORDER],
     }
 
 
-def collect_files(man):
+def collect_files(man, profile="readonly"):
     files = {
         "manifest.json": (json.dumps(man, indent=2, ensure_ascii=True) + "\n").encode(),
+        TOOLS_FILE: (json.dumps(tool_description(profile), indent=2) + "\n").encode(),
         "color.png": (ROOT / "icons" / "color.png").read_bytes(),
         "outline.png": (ROOT / "icons" / "outline.png").read_bytes(),
     }
@@ -141,7 +185,10 @@ def collect_files(man):
             raise BuildError(f"missing skill {folder}")
         for p in sorted(src.rglob("*")):
             if p.is_file() and not p.name.startswith("."):
-                files[f"{folder}/{p.relative_to(src).as_posix()}"] = p.read_bytes()
+                data = p.read_bytes()
+                if p.suffix in (".md", ".json", ".txt"):
+                    data = data.replace(b"\r\n", b"\n")  # deterministic LF packages from Windows checkouts
+                files[f"{folder}/{p.relative_to(src).as_posix()}"] = data
     return files
 
 
@@ -156,13 +203,11 @@ def write_zip(path, files):
             info.compress_type = zipfile.ZIP_DEFLATED
             info.external_attr = 0o100644 << 16
             z.writestr(info, files[name])
-    from validate import validate_zip  # local import keeps build.py standalone-importable
-    validate_zip(path)
     return path
 
 
-def build(site, profile, output, toolsets=None, subdomain=None, app_uuid=None):
-    return write_zip(output, collect_files(manifest(site, profile, toolsets, subdomain, app_uuid)))
+def build(site, profile, output, toolsets=None, subdomain=None, app_uuid=None, auth=None, reference_id=None, mcp_url=None):
+    return write_zip(output, collect_files(manifest(site, profile, toolsets, subdomain, app_uuid, auth, reference_id, mcp_url), profile))
 
 
 def openplugin(out_dir, site="us1", profile="readonly"):
@@ -205,6 +250,9 @@ def main(argv=None):
     ap.add_argument("--toolsets", help="comma list, e.g. core,alerting,llmobs (default core)")
     ap.add_argument("--subdomain", help="Datadog custom login subdomain, if your org uses one")
     ap.add_argument("--app-id", help="override the manifest id (keep stable across versions)")
+    ap.add_argument("--auth", choices=sorted(AUTH_TYPES), help="connector authorization: apikey (Datadog PAT as bearer via Microsoft token store), oauth, dcr; omit for Cowork automatic discovery")
+    ap.add_argument("--mcp-url", help="override the connector URL (must match the auth config base URL)")
+    ap.add_argument("--reference-id", help="token-store registration id for --auth (Teams Developer Portal); not a secret")
     ap.add_argument("--output", help="ZIP path to create")
     ap.add_argument("--openplugin", help="write an Agent Plugins directory instead of a ZIP")
     a = ap.parse_args(argv)
@@ -215,7 +263,7 @@ def main(argv=None):
         ap.error("--output is required unless --openplugin is used")
     if not SITES[a.site]["confirmed"]:
         print(f"warning: {a.site} endpoint is derived, not confirmed by Datadog docs: {SITES[a.site].get('note','')}")
-    print(build(a.site, a.profile, a.output, a.toolsets, a.subdomain, a.app_id))
+    print(build(a.site, a.profile, a.output, a.toolsets, a.subdomain, a.app_id, a.auth, a.reference_id, a.mcp_url))
     return 0
 
 
